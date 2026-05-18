@@ -1,0 +1,1 @@
+-- Seed data for Roommate Finder Platform
