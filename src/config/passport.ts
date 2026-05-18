@@ -1,7 +1,12 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { env } from "./env";
-import { findUserByGoogleId, findUserByEmail, createGoogleUser } from "../repositories/userRepository";
+import {
+  findUserByGoogleId,
+  findUserByEmail,
+  createGoogleUser,
+  linkGoogleAccount,
+} from "../repositories/userRepository";
 
 passport.use(
   new GoogleStrategy(
@@ -20,6 +25,13 @@ passport.use(
         let user = await findUserByGoogleId(googleId);
         if (!user && email) {
           user = await findUserByEmail(email);
+        }
+
+        if (user && !user.google_id) {
+          if (!user.is_email_verified) {
+            return done(new Error("EMAIL_NOT_VERIFIED"));
+          }
+          user = await linkGoogleAccount(user.id, googleId, avatarUrl);
         }
 
         if (!user) {

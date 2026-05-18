@@ -117,6 +117,14 @@ export async function updateAvatarUrl(userId: string, avatarUrl: string): Promis
   return result.rows[0];
 }
 
+export async function linkGoogleAccount(userId: string, googleId: string, avatarUrl: string | null) {
+  const result = await pool.query<UserRecord>(
+    "UPDATE users SET google_id = $1, avatar_url = COALESCE($2, avatar_url), auth_provider = 'google', updated_at = NOW() WHERE id = $3 RETURNING *",
+    [googleId, avatarUrl, userId]
+  );
+  return result.rows[0];
+}
+
 export async function listUsers(params: {
   query?: string;
   status?: "active" | "inactive" | "all";

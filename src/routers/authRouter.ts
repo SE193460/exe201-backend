@@ -32,6 +32,7 @@ router.get(
   passport.authenticate("google", {
     session: false,
     failureRedirect: `${env.frontendUrl}/?error=google`,
+    failureMessage: true,
   }),
   googleCallback
 );
