@@ -8,6 +8,7 @@ export type UserRecord = {
   username: string | null;
   password_hash: string | null;
   full_name: string;
+  phone_number: string | null;
   avatar_url: string | null;
   auth_provider: string;
   google_id: string | null;
@@ -100,11 +101,11 @@ export async function updatePasswordHash(userId: string, passwordHash: string): 
 
 export async function updateUserProfile(
   userId: string,
-  params: { fullName: string; username: string | null; avatarUrl: string | null }
+  params: { fullName: string; username: string | null; avatarUrl: string | null; phoneNumber: string | null }
 ): Promise<UserRecord> {
   const result = await pool.query<UserRecord>(
-    "UPDATE users SET full_name = $1, username = $2, avatar_url = $3, updated_at = NOW() WHERE id = $4 RETURNING *",
-    [params.fullName, params.username, params.avatarUrl, userId]
+    "UPDATE users SET full_name = $1, username = $2, avatar_url = $3, phone_number = $4, updated_at = NOW() WHERE id = $5 RETURNING *",
+    [params.fullName, params.username, params.avatarUrl, params.phoneNumber, userId]
   );
   return result.rows[0];
 }

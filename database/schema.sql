@@ -19,6 +19,8 @@ CREATE TABLE users (
 
     full_name TEXT NOT NULL,
 
+    phone_number TEXT,
+
     avatar_url TEXT,
 
     auth_provider TEXT NOT NULL DEFAULT 'local',
@@ -54,6 +56,71 @@ CREATE TABLE refresh_tokens (
     token TEXT NOT NULL UNIQUE,
 
     expires_at TIMESTAMPTZ NOT NULL,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE listings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    title TEXT NOT NULL,
+
+    description TEXT NOT NULL,
+
+    rent_price INTEGER NOT NULL,
+
+    city TEXT,
+
+    district TEXT NOT NULL,
+
+    ward TEXT,
+
+    address TEXT,
+
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
+
+    available_from DATE,
+
+    preferred_gender TEXT,
+
+    room_type TEXT,
+
+    room_area_sqm INTEGER,
+
+    max_occupants INTEGER,
+
+    current_occupants INTEGER DEFAULT 0,
+
+    smoking_allowed BOOLEAN DEFAULT FALSE,
+
+    pet_allowed BOOLEAN DEFAULT FALSE,
+
+    status TEXT NOT NULL DEFAULT 'DRAFT',
+
+    rejection_reason TEXT,
+
+    published_at TIMESTAMPTZ,
+
+    expires_at TIMESTAMPTZ,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT listings_status_check CHECK (status IN ('DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'EXPIRED'))
+);
+
+CREATE TABLE listing_images (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+
+    image_url TEXT NOT NULL,
+
+    display_order INTEGER DEFAULT 0,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
