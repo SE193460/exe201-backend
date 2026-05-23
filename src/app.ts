@@ -8,6 +8,7 @@ import { env } from "./config/env";
 import authRouter from "./routers/authRouter";
 import userRouter from "./routers/userRouter";
 import adminRouter from "./routers/adminRouter.ts";
+import listingRouter from "./routers/listingRouter";
 import { health } from "./controllers/healthController";
 import { ensureAdminAccount } from "./services/adminBootstrap";
 
@@ -30,6 +31,7 @@ app.get("/health", health);
 app.use("/api/auth", authRouter);
 app.use("/api/users", userRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/listings", listingRouter);
 
 ensureAdminAccount()
   .catch((error) => {

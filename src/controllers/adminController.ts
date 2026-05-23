@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { listUsers, findUserWithRoleById, toggleUserActive } from "../repositories/userRepository";
+import { listAllListingsForAdmin, updateListingStatusByAdmin } from "../repositories/listingRepository";
 
 export async function getUsers(req: Request, res: Response) {
   const query = typeof req.query.q === "string" ? req.query.q : "";
@@ -62,4 +63,67 @@ export async function updateUserStatus(req: Request, res: Response) {
     id: updated.id,
     isActive: updated.is_active,
   });
+}
+
+export async function getAdminListings(req: Request, res: Response) {
+  const listings = await listAllListingsForAdmin();
+  return res.json(
+    listings.map((listing) => ({
+      id: listing.id,
+      ownerId: listing.owner_id,
+      title: listing.title,
+      description: listing.description,
+      rentPrice: listing.rent_price,
+      city: listing.city,
+      district: listing.district,
+      ward: listing.ward,
+      address: listing.address,
+      latitude: listing.latitude,
+      longitude: listing.longitude,
+      availableFrom: listing.available_from,
+      preferredGender: listing.preferred_gender,
+      roomType: listing.room_type,
+      roomAreaSqm: listing.room_area_sqm,
+      maxOccupants: listing.max_occupants,
+      currentOccupants: listing.current_occupants,
+      smokingAllowed: listing.smoking_allowed,
+      petAllowed: listing.pet_allowed,
+      status: listing.status,
+      rejectionReason: listing.rejection_reason,
+      publishedAt: listing.published_at,
+      expiresAt: listing.expires_at,
+      createdAt: listing.created_at,
+      updatedAt: listing.updated_at,
+      images: (listing.images || []).map((img) => ({
+        id: img.id,
+        imageUrl: img.image_url,
+        displayOrder: img.display_order,
+      })),
+    }))
+  );
+}
+
+export async function approveListing(req: Request, res: Response) {
+  const rawId = req.params.id;
+  const listingId = Array.isArray(rawId) ? rawId[0] : rawId;
+  const updated = await updateListingStatusByAdmin(listingId, "APPROVED", null);
+  if (!updated) {
+    return res.status(404).json({ message: "Listing not found" });
+  }
+  return res.json({ id: updated.id, status: updated.status });
+}
+
+export async function rejectListing(req: Request, res: Response) {
+  const rawId = req.params.id;
+  const listingId = Array.isArray(rawId) ? rawId[0] : rawId;
+  const { rejectionReason } = req.body as { rejectionReason?: string };
+  if (!rejectionReason) {
+    return res.status(400).json({ message: "Missing rejectionReason" });
+  }
+
+  const updated = await updateListingStatusByAdmin(listingId, "REJECTED", rejectionReason);
+  if (!updated) {
+    return res.status(404).json({ message: "Listing not found" });
+  }
+  return res.json({ id: updated.id, status: updated.status, rejectionReason: updated.rejection_reason });
 }
