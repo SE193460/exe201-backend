@@ -16,6 +16,7 @@ export async function getMe(req: Request, res: Response) {
     id: user.id,
     email: user.email,
     fullName: user.full_name,
+    phoneNumber: user.phone_number,
     username: user.username,
     avatarUrl: user.avatar_url,
     isEmailVerified: user.is_email_verified,
@@ -29,7 +30,7 @@ export async function updateMe(req: Request, res: Response) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  const { fullName, username, avatarUrl } = req.body;
+  const { fullName, username, avatarUrl, phoneNumber } = req.body;
   if (!fullName) {
     return res.status(400).json({ message: "Missing fullName" });
   }
@@ -38,12 +39,14 @@ export async function updateMe(req: Request, res: Response) {
     fullName,
     username: username ?? null,
     avatarUrl: avatarUrl ?? null,
+    phoneNumber: typeof phoneNumber === "string" ? phoneNumber : null,
   });
 
   return res.json({
     id: updated.id,
     email: updated.email,
     fullName: updated.full_name,
+    phoneNumber: updated.phone_number,
     username: updated.username,
     avatarUrl: updated.avatar_url,
     isEmailVerified: updated.is_email_verified,
