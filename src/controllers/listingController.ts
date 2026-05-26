@@ -6,6 +6,9 @@ import {
   findListingByIdAndOwner,
   listListingsByOwner,
   ListingRecord,
+  submitListingForApproval,
+  listPublicApprovedListings,
+  findPublicApprovedListingById,
 } from "../repositories/listingRepository";
 
 function serializeListing(listing: ListingRecord) {
@@ -222,3 +225,35 @@ export async function updateMyListing(req: Request, res: Response) {
 
   return res.json(serializeListing(updated));
 }
+
+export async function submitMyListing(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const rawId = req.params.id;
+  const listingId = Array.isArray(rawId) ? rawId[0] : rawId;
+  const submitted = await submitListingForApproval(listingId, userId);
+  if (!submitted) {
+    return res.status(404).json({ message: "Listing not found or cannot be submitted (must be in DRAFT or REJECTED status)" });
+  }
+
+  return res.json(serializeListing(submitted));
+}
+
+export async function getPublicListings(req: Request, res: Response) {
+  const listings = await listPublicApprovedListings();
+  return res.json(listings.map(serializeListing));
+}
+
+export async function getPublicListingDetail(req: Request, res: Response) {
+  const rawId = req.params.id;
+  const listingId = Array.isArray(rawId) ? rawId[0] : rawId;
+  const listing = await findPublicApprovedListingById(listingId);
+  if (!listing) {
+    return res.status(404).json({ message: "Listing not found" });
+  }
+  return res.json(serializeListing(listing));
+}
+

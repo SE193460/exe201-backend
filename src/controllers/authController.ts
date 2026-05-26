@@ -32,13 +32,20 @@ export async function register(req: Request, res: Response) {
     }
     return res.status(201).json({ message: "Verification email sent" });
   } catch (error) {
+    console.error("REGISTER ERROR:", error);
+
     if ((error as Error).message === "EMAIL_EXISTS") {
       return res.status(409).json({ message: "Email already exists" });
     }
+
     if ((error as Error).message === "EMAIL_SEND_FAILED") {
       return res.status(502).json({ message: "Email send failed" });
     }
-    return res.status(500).json({ message: "Registration failed" });
+
+    return res.status(500).json({
+      message: "Registration failed",
+      error: (error as Error).message,
+    });
   }
 }
 
