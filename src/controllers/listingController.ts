@@ -9,6 +9,7 @@ import {
   submitListingForApproval,
   listPublicApprovedListings,
   findPublicApprovedListingById,
+  deleteListingImageById,
 } from "../repositories/listingRepository";
 
 function serializeListing(listing: ListingRecord) {
@@ -44,6 +45,10 @@ function serializeListing(listing: ListingRecord) {
       displayOrder: image.display_order,
       createdAt: image.created_at,
     })),
+    ownerName: listing.owner_name || null,
+    ownerPhone: listing.owner_phone || null,
+    ownerAvatar: listing.owner_avatar || null,
+    ownerEmail: listing.owner_email || null,
   };
 }
 
@@ -255,5 +260,29 @@ export async function getPublicListingDetail(req: Request, res: Response) {
     return res.status(404).json({ message: "Listing not found" });
   }
   return res.json(serializeListing(listing));
+}
+
+export async function deleteMyListingImage(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const rawListingId = req.params.id;
+  const listingId = Array.isArray(rawListingId) ? rawListingId[0] : rawListingId;
+  const rawImageId = req.params.imageId;
+  const imageId = Array.isArray(rawImageId) ? rawImageId[0] : rawImageId;
+
+  const listing = await findListingByIdAndOwner(listingId, userId);
+  if (!listing) {
+    return res.status(404).json({ message: "Listing not found" });
+  }
+
+  const deleted = await deleteListingImageById(imageId, listingId);
+  if (!deleted) {
+    return res.status(404).json({ message: "Image not found" });
+  }
+
+  return res.json({ message: "Image deleted successfully", imageId, listingId });
 }
 
