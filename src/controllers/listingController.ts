@@ -11,6 +11,7 @@ import {
   findPublicApprovedListingById,
   deleteListingImageById,
 } from "../repositories/listingRepository";
+import { addAmenitiesToListing, listAmenitiesByIds, setListingAmenities } from "../repositories/amenityRepository";
 
 function serializeListing(listing: ListingRecord) {
   return {
@@ -45,6 +46,7 @@ function serializeListing(listing: ListingRecord) {
       displayOrder: image.display_order,
       createdAt: image.created_at,
     })),
+    amenities: (listing.amenities || []).map((a) => ({ id: a.id, name: a.name })),
     ownerName: listing.owner_name || null,
     ownerPhone: listing.owner_phone || null,
     ownerAvatar: listing.owner_avatar || null,
@@ -77,10 +79,22 @@ export async function createMyListingDraft(req: Request, res: Response) {
     smokingAllowed,
     petAllowed,
     expiresAt,
+    amenityIds,
   } = req.body;
+
+  const normalizedAmenityIds = Array.isArray(amenityIds)
+    ? Array.from(new Set(amenityIds.filter((id) => typeof id === "string")))
+    : [];
 
   if (!title || !description || typeof rentPrice !== "number" || !city || !district || !ward) {
     return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  if (normalizedAmenityIds.length > 0) {
+    const existing = await listAmenitiesByIds(normalizedAmenityIds);
+    if (existing.length !== normalizedAmenityIds.length) {
+      return res.status(400).json({ message: "Invalid amenity selection" });
+    }
   }
 
   const listing = await createListingDraft({
@@ -104,6 +118,10 @@ export async function createMyListingDraft(req: Request, res: Response) {
     petAllowed: typeof petAllowed === "boolean" ? petAllowed : false,
     expiresAt: typeof expiresAt === "string" ? expiresAt : null,
   });
+
+  if (normalizedAmenityIds.length > 0) {
+    await addAmenitiesToListing(listing.id, normalizedAmenityIds);
+  }
 
   return res.status(201).json(serializeListing(listing));
 }
@@ -196,10 +214,22 @@ export async function updateMyListing(req: Request, res: Response) {
     currentOccupants,
     smokingAllowed,
     petAllowed,
+    amenityIds,
   } = req.body;
+
+  const normalizedAmenityIds = Array.isArray(amenityIds)
+    ? Array.from(new Set(amenityIds.filter((id: unknown) => typeof id === "string")))
+    : [];
 
   if (!title || !description || typeof rentPrice !== "number" || !city || !district || !ward) {
     return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  if (normalizedAmenityIds.length > 0) {
+    const existing = await listAmenitiesByIds(normalizedAmenityIds);
+    if (existing.length !== normalizedAmenityIds.length) {
+      return res.status(400).json({ message: "Invalid amenity selection" });
+    }
   }
 
   const updated = await updateListingByIdAndOwner({
@@ -228,7 +258,10 @@ export async function updateMyListing(req: Request, res: Response) {
     return res.status(404).json({ message: "Listing not found" });
   }
 
-  return res.json(serializeListing(updated));
+  await setListingAmenities(listingId, normalizedAmenityIds);
+
+  const result = await findListingByIdAndOwner(listingId, userId);
+  return res.json(serializeListing(result ?? updated));
 }
 
 export async function submitMyListing(req: Request, res: Response) {

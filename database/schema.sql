@@ -124,3 +124,23 @@ CREATE TABLE listing_images (
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE amenities (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    name TEXT NOT NULL UNIQUE,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE listing_amenity (
+    listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+
+    amenity_id UUID NOT NULL REFERENCES amenities(id) ON DELETE RESTRICT,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    PRIMARY KEY (listing_id, amenity_id)
+);

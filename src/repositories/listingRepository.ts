@@ -1,4 +1,4 @@
-import { pool } from "../config/db";
+﻿import { pool } from "../config/db";
 
 export type ListingImageRecord = {
   id: string;
@@ -35,6 +35,7 @@ export type ListingRecord = {
   created_at: string;
   updated_at: string;
   images: ListingImageRecord[];
+  amenities?: { id: string; name: string }[];
   owner_name?: string | null;
   owner_phone?: string | null;
   owner_avatar?: string | null;
@@ -64,45 +65,12 @@ export async function createListingDraft(params: {
 }): Promise<ListingRecord> {
   const result = await pool.query<ListingRecord>(
     `INSERT INTO listings (
-      owner_id,
-      title,
-      description,
-      rent_price,
-      city,
-      district,
-      ward,
-      address,
-      latitude,
-      longitude,
-      available_from,
-      preferred_gender,
-      room_type,
-      room_area_sqm,
-      max_occupants,
-      current_occupants,
-      smoking_allowed,
-      pet_allowed,
-      expires_at
+      owner_id, title, description, rent_price, city, district, ward, address,
+      latitude, longitude, available_from, preferred_gender, room_type,
+      room_area_sqm, max_occupants, current_occupants, smoking_allowed, pet_allowed, expires_at
     ) VALUES (
-      $1,
-      $2,
-      $3,
-      $4,
-      $5,
-      $6,
-      $7,
-      $8,
-      $9,
-      $10,
-      $11,
-      $12,
-      $13,
-      $14,
-      $15,
-      $16,
-      $17,
-      $18,
-      $19
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+      $11, $12, $13, $14, $15, $16, $17, $18, $19
     )
     RETURNING *`,
     [
@@ -149,7 +117,13 @@ export async function listListingsByOwner(ownerId: string): Promise<ListingRecor
                 ) ORDER BY listing_images.display_order
               ) FILTER (WHERE listing_images.id IS NOT NULL),
               '[]'
-            ) AS images
+            ) AS images,
+            (SELECT COALESCE(
+              json_agg(json_build_object('id', a.id, 'name', a.name) ORDER BY a.name),
+              '[]'::json
+            ) FROM listing_amenity la
+             JOIN amenities a ON a.id = la.amenity_id
+             WHERE la.listing_id = listings.id) AS amenities
      FROM listings
      LEFT JOIN users ON users.id = listings.owner_id
      LEFT JOIN listing_images ON listing_images.listing_id = listings.id
@@ -180,202 +154,13 @@ export async function findListingByIdAndOwner(listingId: string, ownerId: string
                 ) ORDER BY listing_images.display_order
               ) FILTER (WHERE listing_images.id IS NOT NULL),
               '[]'
-            ) AS images
-     FROM listings
-     LEFT JOIN users ON users.id = listings.owner_id
-     LEFT JOIN listing_images ON listing_images.listing_id = listings.id
-     WHERE listings.id = $1 AND listings.owner_id = $2
-     GROUP BY listings.id, users.id`,
-    [listingId, ownerId]
-  );
-
-  return result.rows[0] || null;
-}
-
-export async function addListingImages(listingId: string, imageUrls: string[], startOrder = 0) {
-  if (imageUrls.length === 0) {
-    return [] as ListingImageRecord[];
-  }
-
-  const values: string[] = [];
-  const params: Array<string | number> = [];
-
-  imageUrls.forEach((url, index) => {
-    const baseIndex = index * 3;
-    values.push(`($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3})`);
-    params.push(listingId, url, startOrder + index);
-  });
-
-  const result = await pool.query<ListingImageRecord>(
-    `INSERT INTO listing_images (listing_id, image_url, display_order)
-     VALUES ${values.join(", ")}
-     RETURNING *`,
-    params
-  );
-
-  return result.rows;
-}
-
-export async function updateListingByIdAndOwner(params: {
-  listingId: string;
-  ownerId: string;
-  title: string;
-  description: string;
-  rentPrice: number;
-  city: string | null;
-  district: string;
-  ward: string | null;
-  address: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  availableFrom: string | null;
-  preferredGender: string | null;
-  roomType: string | null;
-  roomAreaSqm: number | null;
-  maxOccupants: number | null;
-  currentOccupants: number | null;
-  smokingAllowed: boolean;
-  petAllowed: boolean;
-}): Promise<ListingRecord | null> {
-  const result = await pool.query<ListingRecord>(
-    `WITH updated AS (
-       UPDATE listings
-       SET title = $3,
-           description = $4,
-           rent_price = $5,
-           city = $6,
-           district = $7,
-           ward = $8,
-           address = $9,
-           latitude = $10,
-           longitude = $11,
-           available_from = $12,
-           preferred_gender = $13,
-           room_type = $14,
-           room_area_sqm = $15,
-           max_occupants = $16,
-           current_occupants = $17,
-           smoking_allowed = $18,
-           pet_allowed = $19,
-           updated_at = NOW()
-       WHERE id = $1 AND owner_id = $2
-       RETURNING id
-     )
-     SELECT listings.*,
-            COALESCE(
-              json_agg(
-                json_build_object(
-ward,
-      address,
-      latitude,
-      longitude,
-      available_from,
-      preferred_gender,
-      room_type,
-      room_area_sqm,
-      max_occupants,
-      current_occupants,
-      smoking_allowed,
-      pet_allowed,
-      expires_at
-    ) VALUES (
-      $1,
-      $2,
-      $3,
-      $4,
-      $5,
-      $6,
-      $7,
-      $8,
-      $9,
-      $10,
-      $11,
-      $12,
-      $13,
-      $14,
-      $15,
-      $16,
-      $17,
-      $18,
-      $19
-    )
-    RETURNING *`,
-    [
-      params.ownerId,
-      params.title,
-      params.description,
-      params.rentPrice,
-      params.city ?? null,
-      params.district,
-      params.ward ?? null,
-      params.address ?? null,
-      params.latitude ?? null,
-      params.longitude ?? null,
-      params.availableFrom ?? null,
-      params.preferredGender ?? null,
-      params.roomType ?? null,
-      params.roomAreaSqm ?? null,
-      params.maxOccupants ?? null,
-      params.currentOccupants ?? 0,
-      params.smokingAllowed ?? false,
-      params.petAllowed ?? false,
-      params.expiresAt ?? null,
-    ]
-  );
-
-  return result.rows[0];
-}
-
-export async function listListingsByOwner(ownerId: string): Promise<ListingRecord[]> {
-  const result = await pool.query<ListingRecord>(
-    `SELECT listings.*,
-            users.full_name AS owner_name,
-            users.phone_number AS owner_phone,
-            users.avatar_url AS owner_avatar,
-            users.email AS owner_email,
-            COALESCE(
-              json_agg(
-                json_build_object(
-                  'id', listing_images.id,
-                  'listing_id', listing_images.listing_id,
-                  'image_url', listing_images.image_url,
-                  'display_order', listing_images.display_order,
-                  'created_at', listing_images.created_at
-                ) ORDER BY listing_images.display_order
-              ) FILTER (WHERE listing_images.id IS NOT NULL),
-              '[]'
-            ) AS images
-     FROM listings
-     LEFT JOIN users ON users.id = listings.owner_id
-     LEFT JOIN listing_images ON listing_images.listing_id = listings.id
-     WHERE listings.owner_id = $1
-     GROUP BY listings.id, users.id
-     ORDER BY listings.created_at DESC`,
-    [ownerId]
-  );
-
-  return result.rows;
-}
-
-export async function findListingByIdAndOwner(listingId: string, ownerId: string): Promise<ListingRecord | null> {
-  const result = await pool.query<ListingRecord>(
-    `SELECT listings.*,
-            users.full_name AS owner_name,
-            users.phone_number AS owner_phone,
-            users.avatar_url AS owner_avatar,
-            users.email AS owner_email,
-            COALESCE(
-              json_agg(
-                json_build_object(
-                  'id', listing_images.id,
-                  'listing_id', listing_images.listing_id,
-                  'image_url', listing_images.image_url,
-                  'display_order', listing_images.display_order,
-                  'created_at', listing_images.created_at
-                ) ORDER BY listing_images.display_order
-              ) FILTER (WHERE listing_images.id IS NOT NULL),
-              '[]'
-            ) AS images
+            ) AS images,
+            (SELECT COALESCE(
+              json_agg(json_build_object('id', a.id, 'name', a.name) ORDER BY a.name),
+              '[]'::json
+            ) FROM listing_amenity la
+             JOIN amenities a ON a.id = la.amenity_id
+             WHERE la.listing_id = listings.id) AS amenities
      FROM listings
      LEFT JOIN users ON users.id = listings.owner_id
      LEFT JOIN listing_images ON listing_images.listing_id = listings.id
@@ -468,7 +253,13 @@ export async function updateListingByIdAndOwner(params: {
                 ) ORDER BY listing_images.display_order
               ) FILTER (WHERE listing_images.id IS NOT NULL),
               '[]'
-            ) AS images
+            ) AS images,
+            (SELECT COALESCE(
+              json_agg(json_build_object('id', a.id, 'name', a.name) ORDER BY a.name),
+              '[]'::json
+            ) FROM listing_amenity la
+             JOIN amenities a ON a.id = la.amenity_id
+             WHERE la.listing_id = listings.id) AS amenities
      FROM listings
      JOIN updated ON updated.id = listings.id
      LEFT JOIN listing_images ON listing_images.listing_id = listings.id
@@ -529,7 +320,13 @@ export async function listPublicApprovedListings(): Promise<ListingRecord[]> {
                 ) ORDER BY listing_images.display_order
               ) FILTER (WHERE listing_images.id IS NOT NULL),
               '[]'
-            ) AS images
+            ) AS images,
+            (SELECT COALESCE(
+              json_agg(json_build_object('id', a.id, 'name', a.name) ORDER BY a.name),
+              '[]'::json
+            ) FROM listing_amenity la
+             JOIN amenities a ON a.id = la.amenity_id
+             WHERE la.listing_id = listings.id) AS amenities
      FROM listings
      LEFT JOIN users ON users.id = listings.owner_id
      LEFT JOIN listing_images ON listing_images.listing_id = listings.id
@@ -558,7 +355,13 @@ export async function findPublicApprovedListingById(id: string): Promise<Listing
                 ) ORDER BY listing_images.display_order
               ) FILTER (WHERE listing_images.id IS NOT NULL),
               '[]'
-            ) AS images
+            ) AS images,
+            (SELECT COALESCE(
+              json_agg(json_build_object('id', a.id, 'name', a.name) ORDER BY a.name),
+              '[]'::json
+            ) FROM listing_amenity la
+             JOIN amenities a ON a.id = la.amenity_id
+             WHERE la.listing_id = listings.id) AS amenities
      FROM listings
      LEFT JOIN users ON users.id = listings.owner_id
      LEFT JOIN listing_images ON listing_images.listing_id = listings.id
