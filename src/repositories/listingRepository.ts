@@ -390,7 +390,15 @@ export async function listAllListingsForAdmin(): Promise<ListingRecord[]> {
                 ) ORDER BY listing_images.display_order
               ) FILTER (WHERE listing_images.id IS NOT NULL),
               '[]'
-            ) AS images
+            ) AS images,
+            (
+              SELECT COALESCE(
+                json_agg(json_build_object('id', a.id, 'name', a.name) ORDER BY a.name),
+                '[]'::json
+              ) FROM listing_amenity la
+              JOIN amenities a ON a.id = la.amenity_id
+              WHERE la.listing_id = listings.id
+            ) AS amenities
      FROM listings
      LEFT JOIN users ON users.id = listings.owner_id
      LEFT JOIN listing_images ON listing_images.listing_id = listings.id
@@ -437,7 +445,15 @@ export async function updateListingStatusByAdmin(
                 ) ORDER BY listing_images.display_order
               ) FILTER (WHERE listing_images.id IS NOT NULL),
               '[]'
-            ) AS images
+            ) AS images,
+            (
+              SELECT COALESCE(
+                json_agg(json_build_object('id', a.id, 'name', a.name) ORDER BY a.name),
+                '[]'::json
+              ) FROM listing_amenity la
+              JOIN amenities a ON a.id = la.amenity_id
+              WHERE la.listing_id = listings.id
+            ) AS amenities
      FROM listings
      LEFT JOIN users ON users.id = listings.owner_id
      LEFT JOIN listing_images ON listing_images.listing_id = listings.id

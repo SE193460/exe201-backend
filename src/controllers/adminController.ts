@@ -99,6 +99,11 @@ export async function getAdminListings(req: Request, res: Response) {
         imageUrl: img.image_url,
         displayOrder: img.display_order,
       })),
+      amenities: (listing.amenities || []).map((a) => ({ id: a.id, name: a.name })),
+      ownerName: listing.owner_name,
+      ownerEmail: listing.owner_email,
+      ownerPhone: listing.owner_phone,
+      ownerAvatar: listing.owner_avatar,
     }))
   );
 }
