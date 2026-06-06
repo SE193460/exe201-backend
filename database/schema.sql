@@ -65,6 +65,8 @@ CREATE TABLE listings (
 
     owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 
+    source VARCHAR(2048) NULL,
+
     title TEXT NOT NULL,
 
     description TEXT NOT NULL,

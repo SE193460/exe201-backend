@@ -1,6 +1,17 @@
 import { Request, Response } from "express";
 import { listUsers, findUserWithRoleById, toggleUserActive } from "../repositories/userRepository";
-import { listAllListingsForAdmin, updateListingStatusByAdmin } from "../repositories/listingRepository";
+import {
+  listAllListingsForAdmin,
+  updateListingStatusByAdmin,
+  listAdminImportedListings,
+  findAdminImportedListingById,
+  createAdminImportedListing,
+  updateAdminImportedListing,
+  publishAdminImportedListing,
+  unpublishAdminImportedListing,
+  addListingImages,
+} from "../repositories/listingRepository";
+import { setListingAmenities, listAmenitiesByIds, addAmenitiesToListing } from "../repositories/amenityRepository";
 
 export async function getUsers(req: Request, res: Response) {
   const query = typeof req.query.q === "string" ? req.query.q : "";
@@ -132,3 +143,192 @@ export async function rejectListing(req: Request, res: Response) {
   }
   return res.json({ id: updated.id, status: updated.status, rejectionReason: updated.rejection_reason });
 }
+
+// --- Admin Imported Listings ---
+
+function serializeImported(listing: Awaited<ReturnType<typeof findAdminImportedListingById>>) {
+  if (!listing) return null;
+  return {
+    id: listing.id,
+    ownerId: listing.owner_id,
+    title: listing.title,
+    description: listing.description,
+    rentPrice: listing.rent_price,
+    city: listing.city,
+    district: listing.district,
+    ward: listing.ward,
+    address: listing.address,
+    availableFrom: listing.available_from,
+    preferredGender: listing.preferred_gender,
+    roomType: listing.room_type,
+    roomAreaSqm: listing.room_area_sqm,
+    maxOccupants: listing.max_occupants,
+    currentOccupants: listing.current_occupants,
+    smokingAllowed: listing.smoking_allowed,
+    petAllowed: listing.pet_allowed,
+    status: listing.status,
+    rejectionReason: listing.rejection_reason,
+    publishedAt: listing.published_at,
+    expiresAt: listing.expires_at,
+    createdAt: listing.created_at,
+    updatedAt: listing.updated_at,
+    source: listing.source || null,
+    images: (listing.images || []).map((img) => ({
+      id: img.id,
+      imageUrl: img.image_url,
+      displayOrder: img.display_order,
+    })),
+    amenities: (listing.amenities || []).map((a) => ({ id: a.id, name: a.name })),
+  };
+}
+
+export async function getAdminImportedListings(req: Request, res: Response) {
+  const listings = await listAdminImportedListings();
+  return res.json(listings.map(serializeImported));
+}
+
+export async function getAdminImportedListingById(req: Request, res: Response) {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const listing = await findAdminImportedListingById(id);
+  if (!listing) return res.status(404).json({ message: "Imported listing not found" });
+  return res.json(serializeImported(listing));
+}
+
+export async function createAdminImportedListingHandler(req: Request, res: Response) {
+  const adminId = req.user?.id;
+  if (!adminId) return res.status(401).json({ message: "Unauthorized" });
+
+  const {
+    title, description, rentPrice, city, district, ward, address,
+    availableFrom, preferredGender, roomType, roomAreaSqm,
+    maxOccupants, currentOccupants, smokingAllowed, petAllowed,
+    source, amenityIds, imageUrls,
+  } = req.body as Record<string, unknown>;
+
+  if (!title || !description || typeof rentPrice !== "number" || !district || !source) {
+    return res.status(400).json({ message: "Missing required fields (title, description, rentPrice, district, source)" });
+  }
+
+  const normalizedAmenityIds = Array.isArray(amenityIds)
+    ? Array.from(new Set((amenityIds as unknown[]).filter((id): id is string => typeof id === "string")))
+    : [];
+
+  const listing = await createAdminImportedListing({
+    ownerId: adminId,
+    title: title as string,
+    description: description as string,
+    rentPrice: rentPrice as number,
+    city: typeof city === "string" ? city : null,
+    district: district as string,
+    ward: typeof ward === "string" ? ward : null,
+    address: typeof address === "string" ? address : null,
+    availableFrom: typeof availableFrom === "string" ? availableFrom : null,
+    preferredGender: typeof preferredGender === "string" ? preferredGender : null,
+    roomType: typeof roomType === "string" ? roomType : null,
+    roomAreaSqm: typeof roomAreaSqm === "number" ? roomAreaSqm : null,
+    maxOccupants: typeof maxOccupants === "number" ? maxOccupants : null,
+    currentOccupants: typeof currentOccupants === "number" ? currentOccupants : 0,
+    smokingAllowed: typeof smokingAllowed === "boolean" ? smokingAllowed : false,
+    petAllowed: typeof petAllowed === "boolean" ? petAllowed : false,
+    source: source as string,
+  });
+
+  if (normalizedAmenityIds.length > 0) {
+    await addAmenitiesToListing(listing.id, normalizedAmenityIds);
+  }
+
+  // Add external image URLs if provided
+  if (Array.isArray(imageUrls)) {
+    const validUrls = (imageUrls as unknown[]).filter(
+      (u): u is string => typeof u === "string" && (u.startsWith("http://") || u.startsWith("https://"))
+    );
+    if (validUrls.length > 0) {
+      await addListingImages(listing.id, validUrls, 0);
+    }
+  }
+
+  const full = await findAdminImportedListingById(listing.id);
+  return res.status(201).json(serializeImported(full));
+}
+
+export async function updateAdminImportedListingHandler(req: Request, res: Response) {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const {
+    title, description, rentPrice, city, district, ward, address,
+    availableFrom, preferredGender, roomType, roomAreaSqm,
+    maxOccupants, currentOccupants, smokingAllowed, petAllowed,
+    source, amenityIds,
+  } = req.body as Record<string, unknown>;
+
+  if (!title || !description || typeof rentPrice !== "number" || !district || !source) {
+    return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  const updated = await updateAdminImportedListing({
+    listingId: id,
+    title: title as string,
+    description: description as string,
+    rentPrice: rentPrice as number,
+    city: typeof city === "string" ? city : null,
+    district: district as string,
+    ward: typeof ward === "string" ? ward : null,
+    address: typeof address === "string" ? address : null,
+    availableFrom: typeof availableFrom === "string" ? availableFrom : null,
+    preferredGender: typeof preferredGender === "string" ? preferredGender : null,
+    roomType: typeof roomType === "string" ? roomType : null,
+    roomAreaSqm: typeof roomAreaSqm === "number" ? roomAreaSqm : null,
+    maxOccupants: typeof maxOccupants === "number" ? maxOccupants : null,
+    currentOccupants: typeof currentOccupants === "number" ? currentOccupants : 0,
+    smokingAllowed: typeof smokingAllowed === "boolean" ? smokingAllowed : false,
+    petAllowed: typeof petAllowed === "boolean" ? petAllowed : false,
+    source: source as string,
+  });
+
+  if (!updated) return res.status(404).json({ message: "Imported listing not found" });
+
+  const normalizedAmenityIds = Array.isArray(amenityIds)
+    ? Array.from(new Set((amenityIds as unknown[]).filter((id): id is string => typeof id === "string")))
+    : [];
+  await setListingAmenities(id, normalizedAmenityIds);
+
+  const full = await findAdminImportedListingById(id);
+  return res.json(serializeImported(full));
+}
+
+export async function publishAdminImportedListingHandler(req: Request, res: Response) {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const result = await publishAdminImportedListing(id);
+  if (!result) return res.status(404).json({ message: "Listing not found or already published" });
+  return res.json(serializeImported(result));
+}
+
+export async function unpublishAdminImportedListingHandler(req: Request, res: Response) {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const result = await unpublishAdminImportedListing(id);
+  if (!result) return res.status(404).json({ message: "Listing not found or not published" });
+  return res.json(serializeImported(result));
+}
+
+export async function addAdminImportedListingImageUrls(req: Request, res: Response) {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const listing = await findAdminImportedListingById(id);
+  if (!listing) return res.status(404).json({ message: "Listing not found" });
+
+  const { urls } = req.body as { urls?: unknown };
+  if (!Array.isArray(urls) || urls.length === 0) {
+    return res.status(400).json({ message: "Missing urls" });
+  }
+  const validUrls = (urls as unknown[]).filter(
+    (u): u is string => typeof u === "string" && (u.startsWith("http://") || u.startsWith("https://"))
+  );
+  if (validUrls.length === 0) return res.status(400).json({ message: "No valid URLs" });
+  if (listing.images.length + validUrls.length > 10) {
+    return res.status(400).json({ message: "Image limit exceeded" });
+  }
+  const images = await addListingImages(id, validUrls, listing.images.length);
+  return res.status(201).json({
+    listingId: id,
+    images: images.map((img) => ({ id: img.id, imageUrl: img.image_url, displayOrder: img.display_order })),
+  });
+}
+

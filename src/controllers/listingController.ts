@@ -51,6 +51,7 @@ function serializeListing(listing: ListingRecord) {
     ownerPhone: listing.owner_phone || null,
     ownerAvatar: listing.owner_avatar || null,
     ownerEmail: listing.owner_email || null,
+    source: listing.source || null,
   };
 }
 
@@ -80,6 +81,7 @@ export async function createMyListingDraft(req: Request, res: Response) {
     petAllowed,
     expiresAt,
     amenityIds,
+    source,
   } = req.body;
 
   const normalizedAmenityIds = Array.isArray(amenityIds)
@@ -117,6 +119,7 @@ export async function createMyListingDraft(req: Request, res: Response) {
     smokingAllowed: typeof smokingAllowed === "boolean" ? smokingAllowed : false,
     petAllowed: typeof petAllowed === "boolean" ? petAllowed : false,
     expiresAt: typeof expiresAt === "string" ? expiresAt : null,
+    source: typeof source === "string" && source.trim() ? source.trim() : null,
   });
 
   if (normalizedAmenityIds.length > 0) {
@@ -215,6 +218,7 @@ export async function updateMyListing(req: Request, res: Response) {
     smokingAllowed,
     petAllowed,
     amenityIds,
+    source,
   } = req.body;
 
   const normalizedAmenityIds = Array.isArray(amenityIds)
@@ -252,6 +256,7 @@ export async function updateMyListing(req: Request, res: Response) {
     currentOccupants: typeof currentOccupants === "number" ? currentOccupants : 0,
     smokingAllowed: typeof smokingAllowed === "boolean" ? smokingAllowed : false,
     petAllowed: typeof petAllowed === "boolean" ? petAllowed : false,
+    source: typeof source === "string" && source.trim() ? source.trim() : null,
   });
 
   if (!updated) {
@@ -317,5 +322,41 @@ export async function deleteMyListingImage(req: Request, res: Response) {
   }
 
   return res.json({ message: "Image deleted successfully", imageId, listingId });
+}
+
+export async function addListingImageUrls(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+  const rawId = req.params.id;
+  const listingId = Array.isArray(rawId) ? rawId[0] : rawId;
+  const listing = await findListingByIdAndOwner(listingId, userId);
+  if (!listing) return res.status(404).json({ message: "Listing not found" });
+
+  const { urls } = req.body as { urls?: unknown };
+  if (!Array.isArray(urls) || urls.length === 0) {
+    return res.status(400).json({ message: "Missing urls array" });
+  }
+
+  const validUrls = (urls as unknown[]).filter(
+    (u): u is string => typeof u === "string" && (u.startsWith("http://") || u.startsWith("https://"))
+  );
+  if (validUrls.length === 0) {
+    return res.status(400).json({ message: "No valid URLs provided" });
+  }
+  if (listing.images.length + validUrls.length > 10) {
+    return res.status(400).json({ message: "Listing image limit exceeded" });
+  }
+
+  const images = await addListingImages(listingId, validUrls, listing.images.length);
+  return res.status(201).json({
+    listingId,
+    images: images.map((img) => ({
+      id: img.id,
+      imageUrl: img.image_url,
+      displayOrder: img.display_order,
+      createdAt: img.created_at,
+    })),
+  });
 }
 

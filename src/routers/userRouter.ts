@@ -10,6 +10,7 @@ import {
 	uploadMyListingImages,
 	submitMyListing,
 	deleteMyListingImage,
+	addListingImageUrls,
 } from "../controllers/listingController";
 import { getMe, updateMe, uploadAvatar } from "../controllers/userController";
 import { requireAuth } from "../middlewares/authMiddleware";
@@ -64,5 +65,6 @@ router.put("/me/listings/:id", requireAuth, updateMyListing);
 router.post("/me/listings/:id/images", requireAuth, listingUpload.array("images", 10), uploadMyListingImages);
 router.put("/me/listings/:id/submit", requireAuth, submitMyListing);
 router.delete("/me/listings/:id/images/:imageId", requireAuth, deleteMyListingImage);
+router.post("/me/listings/:id/images/urls", requireAuth, addListingImageUrls);
 
 export default router;

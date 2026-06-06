@@ -34,6 +34,7 @@ export type ListingRecord = {
   expires_at: string | null;
   created_at: string;
   updated_at: string;
+  source?: string | null;
   images: ListingImageRecord[];
   amenities?: { id: string; name: string }[];
   owner_name?: string | null;
@@ -62,15 +63,16 @@ export async function createListingDraft(params: {
   smokingAllowed?: boolean | null;
   petAllowed?: boolean | null;
   expiresAt?: string | null;
+  source?: string | null;
 }): Promise<ListingRecord> {
   const result = await pool.query<ListingRecord>(
     `INSERT INTO listings (
       owner_id, title, description, rent_price, city, district, ward, address,
       latitude, longitude, available_from, preferred_gender, room_type,
-      room_area_sqm, max_occupants, current_occupants, smoking_allowed, pet_allowed, expires_at
+      room_area_sqm, max_occupants, current_occupants, smoking_allowed, pet_allowed, expires_at, source
     ) VALUES (
       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-      $11, $12, $13, $14, $15, $16, $17, $18, $19
+      $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
     )
     RETURNING *`,
     [
@@ -93,6 +95,7 @@ export async function createListingDraft(params: {
       params.smokingAllowed ?? false,
       params.petAllowed ?? false,
       params.expiresAt ?? null,
+      params.source ?? null,
     ]
   );
 
@@ -216,6 +219,7 @@ export async function updateListingByIdAndOwner(params: {
   currentOccupants: number | null;
   smokingAllowed: boolean;
   petAllowed: boolean;
+  source?: string | null;
 }): Promise<ListingRecord | null> {
   const result = await pool.query<ListingRecord>(
     `WITH updated AS (
@@ -237,6 +241,7 @@ export async function updateListingByIdAndOwner(params: {
            current_occupants = $17,
            smoking_allowed = $18,
            pet_allowed = $19,
+           source = $20,
            updated_at = NOW()
        WHERE id = $1 AND owner_id = $2
        RETURNING id
@@ -284,6 +289,7 @@ export async function updateListingByIdAndOwner(params: {
       params.currentOccupants,
       params.smokingAllowed,
       params.petAllowed,
+      params.source ?? null,
     ]
   );
 
@@ -471,3 +477,163 @@ export async function deleteListingImageById(imageId: string, listingId: string)
   );
   return (result.rowCount ?? 0) > 0;
 }
+
+// --- Admin-imported listings ---
+
+export async function createAdminImportedListing(params: {
+  ownerId: string;
+  title: string;
+  description: string;
+  rentPrice: number;
+  city: string | null;
+  district: string;
+  ward: string | null;
+  address?: string | null;
+  availableFrom?: string | null;
+  preferredGender?: string | null;
+  roomType?: string | null;
+  roomAreaSqm?: number | null;
+  maxOccupants?: number | null;
+  currentOccupants?: number | null;
+  smokingAllowed?: boolean;
+  petAllowed?: boolean;
+  source: string;
+}): Promise<ListingRecord> {
+  return createListingDraft({ ...params, source: params.source });
+}
+
+export async function listAdminImportedListings(): Promise<ListingRecord[]> {
+  const result = await pool.query<ListingRecord>(
+    `SELECT listings.*,
+            users.full_name AS owner_name,
+            users.phone_number AS owner_phone,
+            users.avatar_url AS owner_avatar,
+            users.email AS owner_email,
+            COALESCE(
+              json_agg(
+                json_build_object(
+                  'id', listing_images.id,
+                  'listing_id', listing_images.listing_id,
+                  'image_url', listing_images.image_url,
+                  'display_order', listing_images.display_order,
+                  'created_at', listing_images.created_at
+                ) ORDER BY listing_images.display_order
+              ) FILTER (WHERE listing_images.id IS NOT NULL),
+              '[]'
+            ) AS images,
+            (SELECT COALESCE(
+              json_agg(json_build_object('id', a.id, 'name', a.name) ORDER BY a.name),
+              '[]'::json
+            ) FROM listing_amenity la
+             JOIN amenities a ON a.id = la.amenity_id
+             WHERE la.listing_id = listings.id) AS amenities
+     FROM listings
+     LEFT JOIN users ON users.id = listings.owner_id
+     LEFT JOIN listing_images ON listing_images.listing_id = listings.id
+     WHERE listings.source IS NOT NULL AND listings.source != ''
+     GROUP BY listings.id, users.id
+     ORDER BY listings.created_at DESC`
+  );
+  return result.rows;
+}
+
+export async function findAdminImportedListingById(id: string): Promise<ListingRecord | null> {
+  const result = await pool.query<ListingRecord>(
+    `SELECT listings.*,
+            users.full_name AS owner_name,
+            users.phone_number AS owner_phone,
+            users.avatar_url AS owner_avatar,
+            users.email AS owner_email,
+            COALESCE(
+              json_agg(
+                json_build_object(
+                  'id', listing_images.id,
+                  'listing_id', listing_images.listing_id,
+                  'image_url', listing_images.image_url,
+                  'display_order', listing_images.display_order,
+                  'created_at', listing_images.created_at
+                ) ORDER BY listing_images.display_order
+              ) FILTER (WHERE listing_images.id IS NOT NULL),
+              '[]'
+            ) AS images,
+            (SELECT COALESCE(
+              json_agg(json_build_object('id', a.id, 'name', a.name) ORDER BY a.name),
+              '[]'::json
+            ) FROM listing_amenity la
+             JOIN amenities a ON a.id = la.amenity_id
+             WHERE la.listing_id = listings.id) AS amenities
+     FROM listings
+     LEFT JOIN users ON users.id = listings.owner_id
+     LEFT JOIN listing_images ON listing_images.listing_id = listings.id
+     WHERE listings.id = $1 AND listings.source IS NOT NULL
+     GROUP BY listings.id, users.id`,
+    [id]
+  );
+  return result.rows[0] || null;
+}
+
+export async function updateAdminImportedListing(params: {
+  listingId: string;
+  title: string;
+  description: string;
+  rentPrice: number;
+  city: string | null;
+  district: string;
+  ward: string | null;
+  address: string | null;
+  availableFrom: string | null;
+  preferredGender: string | null;
+  roomType: string | null;
+  roomAreaSqm: number | null;
+  maxOccupants: number | null;
+  currentOccupants: number | null;
+  smokingAllowed: boolean;
+  petAllowed: boolean;
+  source: string;
+}): Promise<ListingRecord | null> {
+  const result = await pool.query<ListingRecord>(
+    `UPDATE listings
+     SET title = $2, description = $3, rent_price = $4, city = $5,
+         district = $6, ward = $7, address = $8,
+         available_from = $9, preferred_gender = $10, room_type = $11,
+         room_area_sqm = $12, max_occupants = $13, current_occupants = $14,
+         smoking_allowed = $15, pet_allowed = $16, source = $17,
+         updated_at = NOW()
+     WHERE id = $1 AND source IS NOT NULL
+     RETURNING *`,
+    [
+      params.listingId, params.title, params.description, params.rentPrice,
+      params.city, params.district, params.ward, params.address,
+      params.availableFrom, params.preferredGender, params.roomType,
+      params.roomAreaSqm, params.maxOccupants, params.currentOccupants,
+      params.smokingAllowed, params.petAllowed, params.source,
+    ]
+  );
+  if (result.rows.length === 0) return null;
+  return findAdminImportedListingById(params.listingId);
+}
+
+export async function publishAdminImportedListing(id: string): Promise<ListingRecord | null> {
+  const result = await pool.query<ListingRecord>(
+    `UPDATE listings
+     SET status = 'APPROVED', published_at = NOW(), updated_at = NOW()
+     WHERE id = $1 AND source IS NOT NULL AND status IN ('DRAFT', 'REJECTED')
+     RETURNING *`,
+    [id]
+  );
+  if (result.rows.length === 0) return null;
+  return findAdminImportedListingById(id);
+}
+
+export async function unpublishAdminImportedListing(id: string): Promise<ListingRecord | null> {
+  const result = await pool.query<ListingRecord>(
+    `UPDATE listings
+     SET status = 'DRAFT', updated_at = NOW()
+     WHERE id = $1 AND source IS NOT NULL AND status = 'APPROVED'
+     RETURNING *`,
+    [id]
+  );
+  if (result.rows.length === 0) return null;
+  return findAdminImportedListingById(id);
+}
+

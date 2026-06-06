@@ -6,6 +6,13 @@ import {
   getAdminListings,
   approveListing,
   rejectListing,
+  getAdminImportedListings,
+  getAdminImportedListingById,
+  createAdminImportedListingHandler,
+  updateAdminImportedListingHandler,
+  publishAdminImportedListingHandler,
+  unpublishAdminImportedListingHandler,
+  addAdminImportedListingImageUrls,
 } from "../controllers/adminController";
 import {
   listAdminAmenities,
@@ -24,6 +31,14 @@ router.patch("/users/:id/status", requireAuth, requireAdmin, updateUserStatus);
 router.get("/listings", requireAuth, requireAdmin, getAdminListings);
 router.patch("/listings/:id/approve", requireAuth, requireAdmin, approveListing);
 router.patch("/listings/:id/reject", requireAuth, requireAdmin, rejectListing);
+
+router.get("/imported-listings", requireAuth, requireAdmin, getAdminImportedListings);
+router.get("/imported-listings/:id", requireAuth, requireAdmin, getAdminImportedListingById);
+router.post("/imported-listings", requireAuth, requireAdmin, createAdminImportedListingHandler);
+router.put("/imported-listings/:id", requireAuth, requireAdmin, updateAdminImportedListingHandler);
+router.patch("/imported-listings/:id/publish", requireAuth, requireAdmin, publishAdminImportedListingHandler);
+router.patch("/imported-listings/:id/unpublish", requireAuth, requireAdmin, unpublishAdminImportedListingHandler);
+router.post("/imported-listings/:id/images/urls", requireAuth, requireAdmin, addAdminImportedListingImageUrls);
 
 router.get("/amenities", requireAuth, requireAdmin, listAdminAmenities);
 router.post("/amenities", requireAuth, requireAdmin, createAdminAmenity);
