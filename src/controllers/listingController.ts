@@ -7,6 +7,7 @@ import {
   listListingsByOwner,
   ListingRecord,
   submitListingForApproval,
+  expireApprovedImportedListings,
   listPublicApprovedListings,
   findPublicApprovedListingById,
   deleteListingImageById,
@@ -286,11 +287,13 @@ export async function submitMyListing(req: Request, res: Response) {
 }
 
 export async function getPublicListings(req: Request, res: Response) {
+  await expireApprovedImportedListings(30);
   const listings = await listPublicApprovedListings();
   return res.json(listings.map(serializeListing));
 }
 
 export async function getPublicListingDetail(req: Request, res: Response) {
+  await expireApprovedImportedListings(30);
   const rawId = req.params.id;
   const listingId = Array.isArray(rawId) ? rawId[0] : rawId;
   const listing = await findPublicApprovedListingById(listingId);
