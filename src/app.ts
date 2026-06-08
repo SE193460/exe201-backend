@@ -12,6 +12,7 @@ import listingRouter from "./routers/listingRouter";
 import amenityRouter from "./routers/amenityRouter.ts";
 import { health } from "./controllers/healthController";
 import { ensureAdminAccount } from "./services/adminBootstrap";
+import lifestyleRouter from "./routers/lifestyleRouter";
 
 dotenv.config();
 
@@ -34,6 +35,7 @@ app.use("/api/users", userRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/listings", listingRouter);
 app.use("/api/amenities", amenityRouter);
+app.use("/api", lifestyleRouter);
 
 ensureAdminAccount()
   .catch((error) => {
