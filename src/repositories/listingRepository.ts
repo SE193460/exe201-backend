@@ -242,6 +242,9 @@ export async function updateListingByIdAndOwner(params: {
            smoking_allowed = $18,
            pet_allowed = $19,
            source = $20,
+           status = CASE WHEN status = 'APPROVED' THEN 'PENDING' ELSE status END,
+           rejection_reason = CASE WHEN status = 'APPROVED' THEN NULL ELSE rejection_reason END,
+           published_at = CASE WHEN status = 'APPROVED' THEN NULL ELSE published_at END,
            updated_at = NOW()
        WHERE id = $1 AND owner_id = $2
        RETURNING id
