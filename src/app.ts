@@ -10,8 +10,10 @@ import userRouter from "./routers/userRouter";
 import adminRouter from "./routers/adminRouter.ts";
 import listingRouter from "./routers/listingRouter";
 import amenityRouter from "./routers/amenityRouter.ts";
+import paymentRouter from "./routers/paymentRouter";
 import { health } from "./controllers/healthController";
 import { ensureAdminAccount } from "./services/adminBootstrap";
+import reportRouter from "./routers/reportRouter.ts";
 
 dotenv.config();
 
@@ -26,6 +28,30 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 app.use(passport.initialize());
+
+// Middleware to track active status of logged-in users on any request
+app.use((req, res, next) => {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+  if (token) {
+    try {
+      const jwt = require("jsonwebtoken");
+      const { env } = require("./config/env");
+      const { updateLastActive } = require("./repositories/userRepository");
+      const payload = jwt.verify(token, env.jwtSecret) as { sub: string; email: string; roleId: string | null };
+      if (payload && payload.sub) {
+        req.user = { id: payload.sub, email: payload.email, role_id: payload.roleId };
+        updateLastActive(payload.sub).catch((err: unknown) =>
+          console.error("Failed to update user last active:", err)
+        );
+      }
+    } catch {
+      // ignore invalid tokens in this middleware
+    }
+  }
+  next();
+});
+
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 app.get("/health", health);
@@ -34,6 +60,8 @@ app.use("/api/users", userRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/listings", listingRouter);
 app.use("/api/amenities", amenityRouter);
+app.use("/api/payments", paymentRouter);
+app.use("/api/reports", reportRouter);
 
 ensureAdminAccount()
   .catch((error) => {

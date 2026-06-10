@@ -146,3 +146,19 @@ CREATE TABLE listing_amenity (
 
     PRIMARY KEY (listing_id, amenity_id)
 );
+
+CREATE TABLE reports (
+
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    reporter_id UUID REFERENCES users(id),
+
+    listing_id UUID REFERENCES listings(id),
+
+    reason TEXT NOT NULL,
+
+    status VARCHAR(20) DEFAULT 'PENDING',
+
+    created_at TIMESTAMP DEFAULT NOW()
+
+);

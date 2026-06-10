@@ -16,6 +16,7 @@ export type UserRecord = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  last_active_at?: string;
 };
 
 export async function findUserByEmail(email: string): Promise<UserRecord | null> {
@@ -150,4 +151,8 @@ export async function toggleUserActive(userId: string, isActive: boolean) {
     [isActive, userId]
   );
   return result.rows[0];
+}
+
+export async function updateLastActive(userId: string): Promise<void> {
+  await pool.query("UPDATE users SET last_active_at = NOW() WHERE id = $1", [userId]);
 }

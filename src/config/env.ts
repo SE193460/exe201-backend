@@ -15,6 +15,9 @@ type Env = {
   adminEmail: string | null;
   adminPassword: string | null;
   adminName: string | null;
+  cloudinaryCloudName: string;
+  cloudinaryApiKey: string;
+  cloudinaryApiSecret: string;
 };
 
 function requireEnv(name: string): string {
@@ -38,4 +41,7 @@ export const env: Env = {
   adminEmail: process.env.ADMIN_EMAIL || null,
   adminPassword: process.env.ADMIN_PASSWORD || null,
   adminName: process.env.ADMIN_NAME || null,
+  cloudinaryCloudName: requireEnv("CLOUDINARY_CLOUD_NAME"),
+  cloudinaryApiKey: requireEnv("CLOUDINARY_API_KEY"),
+  cloudinaryApiSecret: requireEnv("CLOUDINARY_API_SECRET"),
 };

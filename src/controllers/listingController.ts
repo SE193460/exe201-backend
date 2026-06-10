@@ -10,8 +10,12 @@ import {
   listPublicApprovedListings,
   findPublicApprovedListingById,
   deleteListingImageById,
+  toggleSaveListing,
+  listSavedListings,
+  createReport,
 } from "../repositories/listingRepository";
 import { addAmenitiesToListing, listAmenitiesByIds, setListingAmenities } from "../repositories/amenityRepository";
+import { uploadImage } from "../services/cloudinaryService";
 
 function serializeListing(listing: ListingRecord) {
   return {
@@ -51,6 +55,10 @@ function serializeListing(listing: ListingRecord) {
     ownerPhone: listing.owner_phone || null,
     ownerAvatar: listing.owner_avatar || null,
     ownerEmail: listing.owner_email || null,
+    ownerCreatedAt: listing.owner_created_at || null,
+    ownerLastActive: listing.owner_last_active || null,
+    ownerListingsCount: listing.owner_listings_count ? Number(listing.owner_listings_count) : 0,
+    isSaved: listing.is_saved || false,
     source: listing.source || null,
   };
 }
@@ -177,18 +185,24 @@ export async function uploadMyListingImages(req: Request, res: Response) {
     return res.status(400).json({ message: "Listing image limit exceeded" });
   }
 
-  const imageUrls = files.map((file) => `/uploads/listings/${file.filename}`);
-  const images = await addListingImages(listingId, imageUrls, listing.images.length);
+  try {
+    const uploadPromises = files.map((file) => uploadImage(file.path, "listings"));
+    const imageUrls = await Promise.all(uploadPromises);
+    const images = await addListingImages(listingId, imageUrls, listing.images.length);
 
-  return res.status(201).json({
-    listingId,
-    images: images.map((image) => ({
-      id: image.id,
-      imageUrl: image.image_url,
-      displayOrder: image.display_order,
-      createdAt: image.created_at,
-    })),
-  });
+    return res.status(201).json({
+      listingId,
+      images: images.map((image) => ({
+        id: image.id,
+        imageUrl: image.image_url,
+        displayOrder: image.display_order,
+        createdAt: image.created_at,
+      })),
+    });
+  } catch (error) {
+    console.error("Cloudinary upload error:", error);
+    return res.status(500).json({ message: "Không thể tải ảnh lên Cloudinary" });
+  }
 }
 
 export async function updateMyListing(req: Request, res: Response) {
@@ -286,14 +300,16 @@ export async function submitMyListing(req: Request, res: Response) {
 }
 
 export async function getPublicListings(req: Request, res: Response) {
-  const listings = await listPublicApprovedListings();
+  const userId = req.user?.id;
+  const listings = await listPublicApprovedListings(userId);
   return res.json(listings.map(serializeListing));
 }
 
 export async function getPublicListingDetail(req: Request, res: Response) {
+  const userId = req.user?.id;
   const rawId = req.params.id;
   const listingId = Array.isArray(rawId) ? rawId[0] : rawId;
-  const listing = await findPublicApprovedListingById(listingId);
+  const listing = await findPublicApprovedListingById(listingId, userId);
   if (!listing) {
     return res.status(404).json({ message: "Listing not found" });
   }
@@ -358,5 +374,38 @@ export async function addListingImageUrls(req: Request, res: Response) {
       createdAt: img.created_at,
     })),
   });
+}
+
+export async function toggleMySavedListing(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  const rawId = req.params.id;
+  const listingId = Array.isArray(rawId) ? rawId[0] : rawId;
+  const result = await toggleSaveListing(userId, listingId);
+  return res.json(result);
+}
+
+export async function listMySavedListings(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  const listings = await listSavedListings(userId);
+  return res.json(listings.map(serializeListing));
+}
+
+export async function reportListing(req: Request, res: Response) {
+  const reporterId = req.user?.id || null;
+  const rawId = req.params.id;
+  const listingId = Array.isArray(rawId) ? rawId[0] : rawId;
+  const { reason, description } = req.body;
+  if (!reason) {
+    return res.status(400).json({ message: "Missing report reason" });
+  }
+  const report = await createReport({
+    reporterId,
+    listingId,
+    reason,
+    description: description || null,
+  });
+  return res.status(201).json({ message: "Báo cáo bài đăng thành công!", report });
 }
 
