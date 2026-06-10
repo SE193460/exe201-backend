@@ -315,6 +315,23 @@ export async function submitListingForApproval(listingId: string, ownerId: strin
   return findListingByIdAndOwner(listingId, ownerId);
 }
 
+export async function expireApprovedImportedListings(days = 30): Promise<number> {
+  const result = await pool.query(
+    `UPDATE listings
+     SET status = 'EXPIRED',
+         expires_at = COALESCE(expires_at, NOW()),
+         updated_at = NOW()
+     WHERE status = 'APPROVED'
+       AND source IS NOT NULL
+       AND source != ''
+       AND published_at IS NOT NULL
+       AND published_at <= NOW() - ($1::int * INTERVAL '1 day')`,
+    [days]
+  );
+
+  return result.rowCount ?? 0;
+}
+
 export async function listPublicApprovedListings(currentUserId?: string): Promise<ListingRecord[]> {
   const result = await pool.query<ListingRecord>(
     `SELECT listings.*,
