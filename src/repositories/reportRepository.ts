@@ -63,13 +63,19 @@ export async function listReports() {
 
         lr.created_at as "createdAt",
 
+        lr.listing_id as "listingId",
+
         reporter.full_name as "reporterName",
 
         reporter.email as "reporterEmail",
 
+        reporter.id as "reporterId",
+
         l.title as "listingTitle",
 
-        owner.full_name as "listingOwner"
+        owner.full_name as "listingOwner",
+
+        owner.id as "listingOwnerId"
 
         FROM listing_reports lr
 
@@ -87,4 +93,14 @@ export async function listReports() {
     );
 
     return result.rows;
+}
+
+export async function updateReportStatus(params: {
+  reportId: string;
+  status: string;
+}): Promise<void> {
+  await pool.query(
+    "UPDATE listing_reports SET status = $1 WHERE id = $2",
+    [params.status, params.reportId]
+  );
 }

@@ -44,12 +44,15 @@ export async function listTransactionsByUser(
     `
     SELECT
 
-    pt.*,
+    pt.id,
+    pt.amount,
+    pt.package_name as "packageName",
+    pt.status,
+    pt.created_at,
 
     l.title as "listingTitle",
 
     u.full_name as "userName",
-
     u.email as "userEmail"
 
     FROM payment_transactions pt
