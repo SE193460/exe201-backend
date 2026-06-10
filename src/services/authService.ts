@@ -29,7 +29,7 @@ function signAccessToken(user: UserRecord) {
   return jwt.sign(
     { sub: user.id, email: user.email, roleId: user.role_id },
     env.jwtSecret,
-    { expiresIn: "15m" }
+    { expiresIn: "30m" }
   );
 }
 
