@@ -10,6 +10,8 @@ import {
   publishAdminImportedListing,
   unpublishAdminImportedListing,
   addListingImages,
+  listAllReports,
+  resolveReport,
 } from "../repositories/listingRepository";
 import { setListingAmenities, listAmenitiesByIds, addAmenitiesToListing } from "../repositories/amenityRepository";
 
@@ -330,5 +332,43 @@ export async function addAdminImportedListingImageUrls(req: Request, res: Respon
     listingId: id,
     images: images.map((img) => ({ id: img.id, imageUrl: img.image_url, displayOrder: img.display_order })),
   });
+}
+
+export async function getReports(req: Request, res: Response) {
+  try {
+    const reports = await listAllReports();
+    return res.json(
+      reports.map((report) => ({
+        id: report.id,
+        reporterId: report.reporter_id,
+        listingId: report.listing_id,
+        reason: report.reason,
+        description: report.description,
+        status: report.status,
+        createdAt: report.created_at,
+        listingTitle: report.listing_title,
+        reporterName: report.reporter_name,
+        reporterEmail: report.reporter_email,
+      }))
+    );
+  } catch (error) {
+    console.error("Fetch listing reports error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function resolveReportHandler(req: Request, res: Response) {
+  const rawId = req.params.id;
+  const reportId = Array.isArray(rawId) ? rawId[0] : rawId;
+  try {
+    const resolved = await resolveReport(reportId);
+    if (!resolved) {
+      return res.status(404).json({ message: "Report not found" });
+    }
+    return res.json({ message: "Phản ánh đã được đánh dấu giải quyết" });
+  } catch (error) {
+    console.error("Resolve report error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 }
 

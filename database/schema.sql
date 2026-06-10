@@ -230,3 +230,19 @@ CREATE TABLE user_roommate_preferences (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE reports (
+
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    reporter_id UUID REFERENCES users(id),
+
+    listing_id UUID REFERENCES listings(id),
+
+    reason TEXT NOT NULL,
+
+    status VARCHAR(20) DEFAULT 'PENDING',
+
+    created_at TIMESTAMP DEFAULT NOW()
+
+);

@@ -13,6 +13,8 @@ import {
   publishAdminImportedListingHandler,
   unpublishAdminImportedListingHandler,
   addAdminImportedListingImageUrls,
+  getReports,
+  resolveReportHandler,
 } from "../controllers/adminController";
 import {
   listAdminAmenities,
@@ -44,5 +46,8 @@ router.get("/amenities", requireAuth, requireAdmin, listAdminAmenities);
 router.post("/amenities", requireAuth, requireAdmin, createAdminAmenity);
 router.patch("/amenities/:id", requireAuth, requireAdmin, updateAdminAmenity);
 router.delete("/amenities/:id", requireAuth, requireAdmin, deleteAdminAmenity);
+
+router.get("/reports", requireAuth, requireAdmin, getReports);
+router.patch("/reports/:id/resolve", requireAuth, requireAdmin, resolveReportHandler);
 
 export default router;

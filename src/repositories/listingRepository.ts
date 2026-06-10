@@ -1,4 +1,4 @@
-﻿import { pool } from "../config/db";
+import { pool } from "../config/db";
 
 export type ListingImageRecord = {
   id: string;
@@ -41,6 +41,10 @@ export type ListingRecord = {
   owner_phone?: string | null;
   owner_avatar?: string | null;
   owner_email?: string | null;
+  owner_created_at?: string | null;
+  owner_last_active?: string | null;
+  owner_listings_count?: number | string | null;
+  is_saved?: boolean;
 };
 
 export async function createListingDraft(params: {
@@ -328,13 +332,17 @@ export async function expireApprovedImportedListings(days = 30): Promise<number>
   return result.rowCount ?? 0;
 }
 
-export async function listPublicApprovedListings(): Promise<ListingRecord[]> {
+export async function listPublicApprovedListings(currentUserId?: string): Promise<ListingRecord[]> {
   const result = await pool.query<ListingRecord>(
     `SELECT listings.*,
             users.full_name AS owner_name,
             users.phone_number AS owner_phone,
             users.avatar_url AS owner_avatar,
             users.email AS owner_email,
+            users.created_at AS owner_created_at,
+            users.last_active_at AS owner_last_active,
+            (SELECT COUNT(*) FROM listings l WHERE l.owner_id = users.id AND l.status = 'APPROVED') AS owner_listings_count,
+            EXISTS(SELECT 1 FROM saved_listings sl WHERE sl.user_id = $1 AND sl.listing_id = listings.id) AS is_saved,
             COALESCE(
               json_agg(
                 json_build_object(
@@ -358,18 +366,23 @@ export async function listPublicApprovedListings(): Promise<ListingRecord[]> {
      LEFT JOIN listing_images ON listing_images.listing_id = listings.id
      WHERE listings.status = 'APPROVED'
      GROUP BY listings.id, users.id
-     ORDER BY listings.published_at DESC, listings.created_at DESC`
+     ORDER BY listings.published_at DESC, listings.created_at DESC`,
+    [currentUserId || null]
   );
   return result.rows;
 }
 
-export async function findPublicApprovedListingById(id: string): Promise<ListingRecord | null> {
+export async function findPublicApprovedListingById(id: string, currentUserId?: string): Promise<ListingRecord | null> {
   const result = await pool.query<ListingRecord>(
     `SELECT listings.*,
             users.full_name AS owner_name,
             users.phone_number AS owner_phone,
             users.avatar_url AS owner_avatar,
             users.email AS owner_email,
+            users.created_at AS owner_created_at,
+            users.last_active_at AS owner_last_active,
+            (SELECT COUNT(*) FROM listings l WHERE l.owner_id = users.id AND l.status = 'APPROVED') AS owner_listings_count,
+            EXISTS(SELECT 1 FROM saved_listings sl WHERE sl.user_id = $2 AND sl.listing_id = listings.id) AS is_saved,
             COALESCE(
               json_agg(
                 json_build_object(
@@ -393,7 +406,7 @@ export async function findPublicApprovedListingById(id: string): Promise<Listing
      LEFT JOIN listing_images ON listing_images.listing_id = listings.id
      WHERE listings.id = $1 AND listings.status = 'APPROVED'
      GROUP BY listings.id, users.id`,
-    [id]
+    [id, currentUserId || null]
   );
   return result.rows[0] || null;
 }
@@ -655,5 +668,121 @@ export async function unpublishAdminImportedListing(id: string): Promise<Listing
   );
   if (result.rows.length === 0) return null;
   return findAdminImportedListingById(id);
+}
+
+// --- Saved Listings ---
+
+export async function toggleSaveListing(userId: string, listingId: string): Promise<{ isSaved: boolean }> {
+  // Check if saved
+  const checkRes = await pool.query(
+    "SELECT 1 FROM saved_listings WHERE user_id = $1 AND listing_id = $2",
+    [userId, listingId]
+  );
+
+  if (checkRes.rowCount && checkRes.rowCount > 0) {
+    // Already saved, so delete
+    await pool.query(
+      "DELETE FROM saved_listings WHERE user_id = $1 AND listing_id = $2",
+      [userId, listingId]
+    );
+    return { isSaved: false };
+  } else {
+    // Not saved, so insert
+    await pool.query(
+      "INSERT INTO saved_listings (user_id, listing_id) VALUES ($1, $2)",
+      [userId, listingId]
+    );
+    return { isSaved: true };
+  }
+}
+
+export async function listSavedListings(userId: string): Promise<ListingRecord[]> {
+  const result = await pool.query<ListingRecord>(
+    `SELECT listings.*,
+            users.full_name AS owner_name,
+            users.phone_number AS owner_phone,
+            users.avatar_url AS owner_avatar,
+            users.email AS owner_email,
+            users.created_at AS owner_created_at,
+            users.last_active_at AS owner_last_active,
+            (SELECT COUNT(*) FROM listings l WHERE l.owner_id = users.id AND l.status = 'APPROVED') AS owner_listings_count,
+            true AS is_saved,
+            COALESCE(
+              json_agg(
+                json_build_object(
+                  'id', listing_images.id,
+                  'listing_id', listing_images.listing_id,
+                  'image_url', listing_images.image_url,
+                  'display_order', listing_images.display_order,
+                  'created_at', listing_images.created_at
+                ) ORDER BY listing_images.display_order
+              ) FILTER (WHERE listing_images.id IS NOT NULL),
+              '[]'
+            ) AS images,
+            (SELECT COALESCE(
+              json_agg(json_build_object('id', a.id, 'name', a.name) ORDER BY a.name),
+              '[]'::json
+            ) FROM listing_amenity la
+             JOIN amenities a ON a.id = la.amenity_id
+             WHERE la.listing_id = listings.id) AS amenities
+     FROM listings
+     JOIN saved_listings sl ON sl.listing_id = listings.id AND sl.user_id = $1
+     LEFT JOIN users ON users.id = listings.owner_id
+     LEFT JOIN listing_images ON listing_images.listing_id = listings.id
+     WHERE listings.status = 'APPROVED'
+     GROUP BY listings.id, users.id, sl.created_at
+     ORDER BY sl.created_at DESC`,
+    [userId]
+  );
+  return result.rows;
+}
+
+// --- Listing Reports ---
+
+export type ListingReportRecord = {
+  id: string;
+  reporter_id: string | null;
+  listing_id: string;
+  reason: string;
+  description: string | null;
+  status: string;
+  created_at: string;
+  listing_title?: string;
+  reporter_name?: string | null;
+  reporter_email?: string | null;
+};
+
+export async function createReport(params: {
+  reporterId: string | null;
+  listingId: string;
+  reason: string;
+  description: string | null;
+}): Promise<ListingReportRecord> {
+  const result = await pool.query<ListingReportRecord>(
+    `INSERT INTO listing_reports (reporter_id, listing_id, reason, description)
+     VALUES ($1, $2, $3, $4)
+     RETURNING *`,
+    [params.reporterId, params.listingId, params.reason, params.description]
+  );
+  return result.rows[0];
+}
+
+export async function listAllReports(): Promise<ListingReportRecord[]> {
+  const result = await pool.query<ListingReportRecord>(
+    `SELECT lr.*, l.title AS listing_title, u.full_name AS reporter_name, u.email AS reporter_email
+     FROM listing_reports lr
+     JOIN listings l ON l.id = lr.listing_id
+     LEFT JOIN users u ON u.id = lr.reporter_id
+     ORDER BY lr.created_at DESC`
+  );
+  return result.rows;
+}
+
+export async function resolveReport(reportId: string): Promise<boolean> {
+  const result = await pool.query(
+    "UPDATE listing_reports SET status = 'RESOLVED' WHERE id = $1 RETURNING *",
+    [reportId]
+  );
+  return (result.rowCount ?? 0) > 0;
 }
 

@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { findUserById, findUserWithRoleById, updateAvatarUrl, updateUserProfile } from "../repositories/userRepository";
+import { uploadImage } from "../services/cloudinaryService";
 
 export async function getMe(req: Request, res: Response) {
   const userId = req.user?.id;
@@ -64,10 +65,15 @@ export async function uploadAvatar(req: Request, res: Response) {
     return res.status(400).json({ message: "Missing avatar file" });
   }
 
-  const avatarUrl = `/uploads/${file.filename}`;
-  const updated = await updateAvatarUrl(userId, avatarUrl);
+  try {
+    const avatarUrl = await uploadImage(file.path, "avatars");
+    const updated = await updateAvatarUrl(userId, avatarUrl);
 
-  return res.json({
-    avatarUrl: updated.avatar_url,
-  });
+    return res.json({
+      avatarUrl: updated.avatar_url,
+    });
+  } catch (error) {
+    console.error("Avatar upload error:", error);
+    return res.status(500).json({ message: "Failed to upload avatar" });
+  }
 }
