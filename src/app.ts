@@ -15,6 +15,7 @@ import { health } from "./controllers/healthController";
 import { ensureAdminAccount } from "./services/adminBootstrap";
 import lifestyleRouter from "./routers/lifestyleRouter";
 import reportRouter from "./routers/reportRouter.ts";
+import notificationRouter from "./routers/notificationRouter";
 
 dotenv.config();
 
@@ -64,6 +65,7 @@ app.use("/api/amenities", amenityRouter);
 app.use("/api", lifestyleRouter);
 app.use("/api/payments", paymentRouter);
 app.use("/api/reports", reportRouter);
+app.use("/api/notifications", notificationRouter);
 
 ensureAdminAccount()
   .catch((error) => {
