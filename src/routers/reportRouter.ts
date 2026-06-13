@@ -7,12 +7,14 @@ router.post("/", requireAuth, submitReport);
 
 router.get(
     "/admin",
+    requireAuth,
     requireAdmin,
     getReports
 );
 
 router.patch(
     "/admin/:id/status",
+    requireAuth,
     requireAdmin,
     resolveReport
 );

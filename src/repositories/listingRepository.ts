@@ -360,13 +360,32 @@ export async function listPublicApprovedListings(currentUserId?: string): Promis
               '[]'::json
             ) FROM listing_amenity la
              JOIN amenities a ON a.id = la.amenity_id
-             WHERE la.listing_id = listings.id) AS amenities
+             WHERE la.listing_id = listings.id) AS amenities,
+            lp.package_type AS promo_type,
+            lp.purchased_at AS promo_purchased_at,
+            lp.expires_at AS promo_expires_at
      FROM listings
      LEFT JOIN users ON users.id = listings.owner_id
      LEFT JOIN listing_images ON listing_images.listing_id = listings.id
+     LEFT JOIN LATERAL (
+       SELECT package_type, purchased_at, expires_at
+       FROM listing_promotions
+       WHERE listing_id = listings.id
+       ORDER BY purchased_at DESC
+       LIMIT 1
+     ) lp ON true
      WHERE listings.status = 'APPROVED'
-     GROUP BY listings.id, users.id
-     ORDER BY listings.published_at DESC, listings.created_at DESC`,
+     GROUP BY listings.id, users.id, lp.package_type, lp.purchased_at, lp.expires_at
+     ORDER BY
+       CASE
+         WHEN lp.expires_at IS NOT NULL AND lp.expires_at > NOW() AND lp.package_type = 'standard' THEN 1
+         WHEN lp.expires_at IS NOT NULL AND lp.expires_at > NOW() AND lp.package_type = 'premium' THEN 2
+         WHEN lp.expires_at IS NOT NULL AND lp.expires_at <= NOW() AND lp.package_type = 'premium' THEN 3
+         WHEN lp.expires_at IS NOT NULL AND lp.expires_at <= NOW() AND lp.package_type = 'standard' THEN 4
+         WHEN listings.published_at IS NOT NULL AND listings.published_at > NOW() - INTERVAL '1 day' THEN 5
+         ELSE 6
+       END ASC,
+       COALESCE(lp.purchased_at, listings.published_at, listings.created_at) DESC`,
     [currentUserId || null]
   );
   return result.rows;
@@ -400,12 +419,22 @@ export async function findPublicApprovedListingById(id: string, currentUserId?: 
               '[]'::json
             ) FROM listing_amenity la
              JOIN amenities a ON a.id = la.amenity_id
-             WHERE la.listing_id = listings.id) AS amenities
+             WHERE la.listing_id = listings.id) AS amenities,
+            lp.package_type AS promo_type,
+            lp.purchased_at AS promo_purchased_at,
+            lp.expires_at AS promo_expires_at
      FROM listings
      LEFT JOIN users ON users.id = listings.owner_id
      LEFT JOIN listing_images ON listing_images.listing_id = listings.id
+     LEFT JOIN LATERAL (
+       SELECT package_type, purchased_at, expires_at
+       FROM listing_promotions
+       WHERE listing_id = listings.id
+       ORDER BY purchased_at DESC
+       LIMIT 1
+     ) lp ON true
      WHERE listings.id = $1 AND listings.status = 'APPROVED'
-     GROUP BY listings.id, users.id`,
+     GROUP BY listings.id, users.id, lp.package_type, lp.purchased_at, lp.expires_at`,
     [id, currentUserId || null]
   );
   return result.rows[0] || null;

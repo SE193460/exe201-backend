@@ -14,6 +14,7 @@ import {
   resolveReport,
 } from "../repositories/listingRepository";
 import { setListingAmenities, listAmenitiesByIds, addAmenitiesToListing } from "../repositories/amenityRepository";
+import { createNotification } from "../repositories/notificationRepository";
 
 export async function getUsers(req: Request, res: Response) {
   const query = typeof req.query.q === "string" ? req.query.q : "";
@@ -128,6 +129,14 @@ export async function approveListing(req: Request, res: Response) {
   if (!updated) {
     return res.status(404).json({ message: "Listing not found" });
   }
+  // Notify the owner
+  await createNotification({
+    userId: updated.owner_id,
+    type: "listing_approved",
+    title: "Bài đăng đã được duyệt",
+    message: `Bài đăng "${updated.title}" của bạn đã được duyệt và hiển thị công khai.`,
+    listingId: updated.id,
+  });
   return res.json({ id: updated.id, status: updated.status });
 }
 
@@ -143,6 +152,14 @@ export async function rejectListing(req: Request, res: Response) {
   if (!updated) {
     return res.status(404).json({ message: "Listing not found" });
   }
+  // Notify the owner
+  await createNotification({
+    userId: updated.owner_id,
+    type: "listing_rejected",
+    title: "Bài đăng bị từ chối",
+    message: `Bài đăng "${updated.title}" của bạn bị từ chối vì: ${rejectionReason}`,
+    listingId: updated.id,
+  });
   return res.json({ id: updated.id, status: updated.status, rejectionReason: updated.rejection_reason });
 }
 
