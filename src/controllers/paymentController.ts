@@ -1,20 +1,69 @@
 import { Request, Response } from "express";
-import { createTransaction, listTransactionsByUser, listAllTransactions } from "../repositories/paymentRepository";
+import { createTransaction, listTransactionsByUser, listAllTransactions, listPendingTransactions } from "../repositories/paymentRepository";
+import { createPromotion } from "../repositories/promotionRepository";
+import { createNotification, notifyAllAdmins } from "../repositories/notificationRepository";
+import { sendInvoiceEmail } from "../services/emailService";
 import { pool } from "../config/db";
 
-export async function checkout(req: Request, res: Response) {
-  const userId = req.user?.id;
-  if (!userId) {
-    return res.status(401).json({ message: "Unauthorized" });
+const PACKAGE_CONFIG: Record<number, { type: string; label: string; durationDays: number }> = {
+  5000: { type: "standard", label: "Gói 5.000đ", durationDays: 1 },
+  15000: { type: "premium", label: "Gói 15.000đ", durationDays: 7 },
+};
+
+const TRANSFER_CONTENT: Record<number, string> = {
+  5000: "ROOMIE5K",
+  15000: "ROOMIE15K",
+};
+
+const BANK_CODE = "BIDV";
+const ACCOUNT_NUMBER = "6522516046";
+const ACCOUNT_NAME = "Pham Thi Kim Huong";
+
+export async function generateQR(req: Request, res: Response) {
+  const { listingId, amount } = req.body;
+  if (!listingId || typeof amount !== "number") {
+    return res.status(400).json({ message: "Missing listingId or amount" });
   }
 
-  const { listingId, packageName, amount } = req.body;
-  if (!listingId || !packageName || typeof amount !== "number") {
+  const pkg = PACKAGE_CONFIG[amount];
+  if (!pkg) {
+    return res.status(400).json({ message: "Invalid package amount" });
+  }
+
+  const content = TRANSFER_CONTENT[amount];
+  const qrUrl = `https://img.vietqr.io/image/${BANK_CODE}-${ACCOUNT_NUMBER}-compact2.png?amount=${amount}&addInfo=${content}&accountName=${encodeURIComponent(ACCOUNT_NAME)}`;
+
+  return res.json({
+    qrUrl,
+    bankInfo: {
+      bank: "BIDV",
+      accountNumber: ACCOUNT_NUMBER,
+      accountName: ACCOUNT_NAME,
+    },
+    amount,
+    content,
+    packageType: pkg.type,
+    packageLabel: pkg.label,
+    durationDays: pkg.durationDays,
+  });
+}
+
+export async function confirmTransfer(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+  const { listingId, amount, packageName } = req.body;
+  if (!listingId || typeof amount !== "number" || !packageName) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
+  const pkg = PACKAGE_CONFIG[amount];
+  if (!pkg) {
+    return res.status(400).json({ message: "Invalid package amount" });
+  }
+
   try {
-    // 1. Verify listing ownership and check if it exists
+    // Verify listing ownership
     const listingRes = await pool.query(
       "SELECT * FROM listings WHERE id = $1 AND owner_id = $2",
       [listingId, userId]
@@ -23,38 +72,136 @@ export async function checkout(req: Request, res: Response) {
       return res.status(404).json({ message: "Listing not found or access denied" });
     }
 
-    // 2. Update listing to set status = 'APPROVED' and published_at = NOW() (to push it to the top)
-    await pool.query(
-      `UPDATE listings
-       SET status = 'APPROVED', published_at = NOW(), updated_at = NOW()
-       WHERE id = $1`,
-      [listingId]
-    );
-
-    // 3. Save the transaction in the database
+    // Create pending transaction
     const transaction = await createTransaction({
       userId,
       listingId,
       amount,
       packageName,
-      status: "COMPLETED",
+      status: "PENDING",
+    });
+
+    // Notify admins about new pending payment
+    await notifyAllAdmins({
+      type: "new_pending_payment",
+      title: "Yêu cầu thanh toán mới",
+      message: `Người dùng đã chuyển khoản ${amount.toLocaleString()}đ cho gói "${packageName}". Vui lòng kiểm tra và xác nhận.`,
+      listingId,
     });
 
     return res.status(201).json({
-      message: "Thanh toán thành công và đẩy bài đăng thành công!",
+      message: "Xác nhận chuyển khoản thành công. Vui lòng chờ admin xác nhận.",
       transaction,
     });
   } catch (error) {
-    console.error("Payment checkout error:", error);
+    console.error("Confirm transfer error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function adminConfirmPayment(req: Request, res: Response) {
+  const adminId = req.user?.id;
+  if (!adminId) return res.status(401).json({ message: "Unauthorized" });
+
+  const rawId = req.params.id;
+  const transactionId = Array.isArray(rawId) ? rawId[0] : rawId;
+
+  try {
+    // Get transaction details
+    const txnRes = await pool.query<{
+      id: string;
+      user_id: string;
+      listing_id: string;
+      amount: number;
+      package_name: string;
+    }>("SELECT * FROM payment_transactions WHERE id = $1", [transactionId]);
+
+    if (txnRes.rows.length === 0) {
+      return res.status(404).json({ message: "Transaction not found" });
+    }
+
+    const txn = txnRes.rows[0];
+
+    // Get listing details
+    const listingRes = await pool.query<{ title: string; owner_id: string }>(
+      "SELECT title, owner_id FROM listings WHERE id = $1",
+      [txn.listing_id]
+    );
+    if (listingRes.rows.length === 0) {
+      return res.status(404).json({ message: "Listing not found" });
+    }
+
+    const listing = listingRes.rows[0];
+
+    // Get user info for email
+    const userRes = await pool.query<{ email: string; full_name: string }>(
+      "SELECT email, full_name FROM users WHERE id = $1",
+      [txn.user_id]
+    );
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const user = userRes.rows[0];
+    const pkg = PACKAGE_CONFIG[txn.amount];
+
+    if (!pkg) {
+      return res.status(400).json({ message: "Invalid transaction amount" });
+    }
+
+    // Update transaction to COMPLETED
+    await pool.query(
+      "UPDATE payment_transactions SET status = 'COMPLETED' WHERE id = $1",
+      [transactionId]
+    );
+
+    // Ensure listing is APPROVED
+    await pool.query(
+      `UPDATE listings SET status = 'APPROVED', published_at = NOW(), updated_at = NOW() WHERE id = $1`,
+      [txn.listing_id]
+    );
+
+    // Create promotion
+    const expiresAt = new Date(Date.now() + pkg.durationDays * 86400000);
+    await createPromotion({
+      listingId: txn.listing_id,
+      packageType: pkg.type,
+      expiresAt,
+    });
+
+    // Notify user
+    await createNotification({
+      userId: txn.user_id,
+      type: "payment_confirmed",
+      title: "Thanh toán thành công",
+      message: `Gói "${txn.package_name}" cho bài đăng "${listing.title}" đã được xác nhận. Bài đăng của bạn đang được ưu tiên hiển thị.`,
+      listingId: txn.listing_id,
+    });
+
+    // Send invoice email
+    try {
+      await sendInvoiceEmail({
+        to: user.email,
+        userName: user.full_name,
+        listingTitle: listing.title,
+        packageName: txn.package_name,
+        amount: txn.amount,
+        transactionId: txn.id,
+      });
+    } catch {
+      console.error("Failed to send invoice email");
+    }
+
+    return res.json({ message: "Payment confirmed, promotion activated, invoice sent" });
+  } catch (error) {
+    console.error("Admin confirm payment error:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 }
 
 export async function getMyHistory(req: Request, res: Response) {
   const userId = req.user?.id;
-  if (!userId) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
   try {
     const history = await listTransactionsByUser(userId);
@@ -71,6 +218,16 @@ export async function getAllHistory(req: Request, res: Response) {
     return res.json(history);
   } catch (error) {
     console.error("Fetch all transactions error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function getPendingPayments(req: Request, res: Response) {
+  try {
+    const pending = await listPendingTransactions();
+    return res.json(pending);
+  } catch (error) {
+    console.error("Fetch pending payments error:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 }

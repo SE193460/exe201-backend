@@ -76,6 +76,28 @@ export async function listTransactionsByUser(
 
 }
 
+export async function listPendingTransactions() {
+  const result = await pool.query(
+    `SELECT
+      pt.id,
+      pt.amount,
+      pt.package_name as "packageName",
+      pt.status,
+      pt.created_at,
+      l.title as "listingTitle",
+      u.full_name as "userName",
+      u.email as "userEmail",
+      pt.listing_id,
+      pt.user_id
+     FROM payment_transactions pt
+     LEFT JOIN listings l ON l.id = pt.listing_id
+     LEFT JOIN users u ON u.id = pt.user_id
+     WHERE pt.status = 'PENDING'
+     ORDER BY pt.created_at DESC`
+  );
+  return result.rows;
+}
+
 export async function listAllTransactions() {
 
   const result = await pool.query(
