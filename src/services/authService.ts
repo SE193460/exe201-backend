@@ -37,6 +37,10 @@ function signRefreshToken() {
   return crypto.randomBytes(48).toString("hex");
 }
 
+function isStrongPassword(password: string) {
+  return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/.test(password);
+}
+
 export async function registerLocal(params: {
   email: string;
   password: string;
@@ -169,6 +173,34 @@ export async function logout(refreshToken: string) {
 }
 
 export async function resetPassword(userId: string, newPassword: string) {
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await updatePasswordHash(userId, passwordHash);
+}
+
+export async function changePasswordForUser(userId: string, currentPassword: string, newPassword: string) {
+  if (!isStrongPassword(newPassword)) {
+    throw new Error("WEAK_PASSWORD");
+  }
+
+  const user = await findUserById(userId);
+  if (!user) {
+    throw new Error("USER_NOT_FOUND");
+  }
+
+  if (!user.password_hash) {
+    throw new Error("LOCAL_PASSWORD_NOT_SET");
+  }
+
+  const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
+  if (!isCurrentPasswordValid) {
+    throw new Error("INVALID_CURRENT_PASSWORD");
+  }
+
+  const isSameAsCurrent = await bcrypt.compare(newPassword, user.password_hash);
+  if (isSameAsCurrent) {
+    throw new Error("NEW_PASSWORD_SAME_AS_OLD");
+  }
+
   const passwordHash = await bcrypt.hash(newPassword, 10);
   await updatePasswordHash(userId, passwordHash);
 }

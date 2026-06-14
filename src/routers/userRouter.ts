@@ -12,7 +12,7 @@ import {
 	deleteMyListingImage,
 	addListingImageUrls,
 } from "../controllers/listingController";
-import { getMe, updateMe, uploadAvatar } from "../controllers/userController";
+import { changeMyPassword, getMe, updateMe, uploadAvatar } from "../controllers/userController";
 import { requireAuth } from "../middlewares/authMiddleware";
 
 const router = Router();
@@ -57,6 +57,7 @@ const listingUpload = multer({
 
 router.get("/me", requireAuth, getMe);
 router.put("/me", requireAuth, updateMe);
+router.put("/me/password", requireAuth, changeMyPassword);
 router.post("/me/avatar", requireAuth, upload.single("avatar"), uploadAvatar);
 router.post("/me/listings", requireAuth, createMyListingDraft);
 router.get("/me/listings", requireAuth, listMyListings);
