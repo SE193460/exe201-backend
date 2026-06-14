@@ -63,7 +63,7 @@ router.post("/me/listings", requireAuth, createMyListingDraft);
 router.get("/me/listings", requireAuth, listMyListings);
 router.get("/me/listings/:id", requireAuth, getMyListingDetail);
 router.put("/me/listings/:id", requireAuth, updateMyListing);
-router.post("/me/listings/:id/images", requireAuth, listingUpload.array("images", 10), uploadMyListingImages);
+router.post("/me/listings/:id/images", requireAuth, listingUpload.array("images", 20), uploadMyListingImages);
 router.put("/me/listings/:id/submit", requireAuth, submitMyListing);
 router.delete("/me/listings/:id/images/:imageId", requireAuth, deleteMyListingImage);
 router.post("/me/listings/:id/images/urls", requireAuth, addListingImageUrls);

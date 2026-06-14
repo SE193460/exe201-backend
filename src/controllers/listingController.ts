@@ -182,7 +182,7 @@ export async function uploadMyListingImages(req: Request, res: Response) {
     return res.status(400).json({ message: "Missing listing images" });
   }
 
-  if (listing.images.length + files.length > 10) {
+  if (listing.images.length + files.length > 20) {
     return res.status(400).json({ message: "Listing image limit exceeded" });
   }
 
@@ -363,7 +363,7 @@ export async function addListingImageUrls(req: Request, res: Response) {
   if (validUrls.length === 0) {
     return res.status(400).json({ message: "No valid URLs provided" });
   }
-  if (listing.images.length + validUrls.length > 10) {
+  if (listing.images.length + validUrls.length > 20) {
     return res.status(400).json({ message: "Listing image limit exceeded" });
   }
 

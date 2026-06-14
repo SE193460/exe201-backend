@@ -261,6 +261,9 @@ export async function createAdminImportedListingHandler(req: Request, res: Respo
     const validUrls = (imageUrls as unknown[]).filter(
       (u): u is string => typeof u === "string" && (u.startsWith("http://") || u.startsWith("https://"))
     );
+    if (validUrls.length > 20) {
+      return res.status(400).json({ message: "Image limit exceeded" });
+    }
     if (validUrls.length > 0) {
       await addListingImages(listing.id, validUrls, 0);
     }
@@ -341,7 +344,7 @@ export async function addAdminImportedListingImageUrls(req: Request, res: Respon
     (u): u is string => typeof u === "string" && (u.startsWith("http://") || u.startsWith("https://"))
   );
   if (validUrls.length === 0) return res.status(400).json({ message: "No valid URLs" });
-  if (listing.images.length + validUrls.length > 10) {
+  if (listing.images.length + validUrls.length > 20) {
     return res.status(400).json({ message: "Image limit exceeded" });
   }
   const images = await addListingImages(id, validUrls, listing.images.length);

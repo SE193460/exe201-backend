@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
     amount INTEGER NOT NULL,
     package_name TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'COMPLETED',
+    code TEXT UNIQUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

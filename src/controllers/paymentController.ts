@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { createTransaction, listTransactionsByUser, listAllTransactions, listPendingTransactions } from "../repositories/paymentRepository";
+import { createTransaction, listTransactionsByUser, listAllTransactions, listPendingTransactions, PaymentTransactionRecord } from "../repositories/paymentRepository";
 import { createPromotion } from "../repositories/promotionRepository";
 import { createNotification, notifyAllAdmins } from "../repositories/notificationRepository";
 import { sendInvoiceEmail } from "../services/emailService";
@@ -10,16 +10,14 @@ const PACKAGE_CONFIG: Record<number, { type: string; label: string; durationDays
   15000: { type: "premium", label: "Gói 15.000đ", durationDays: 7 },
 };
 
-const TRANSFER_CONTENT: Record<number, string> = {
-  5000: "ROOMIE5K",
-  15000: "ROOMIE15K",
-};
-
 const BANK_CODE = "BIDV";
 const ACCOUNT_NUMBER = "6522516046";
 const ACCOUNT_NAME = "Pham Thi Kim Huong";
 
 export async function generateQR(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
   const { listingId, amount } = req.body;
   if (!listingId || typeof amount !== "number") {
     return res.status(400).json({ message: "Missing listingId or amount" });
@@ -30,22 +28,42 @@ export async function generateQR(req: Request, res: Response) {
     return res.status(400).json({ message: "Invalid package amount" });
   }
 
-  const content = TRANSFER_CONTENT[amount];
-  const qrUrl = `https://img.vietqr.io/image/${BANK_CODE}-${ACCOUNT_NUMBER}-compact2.png?amount=${amount}&addInfo=${content}&accountName=${encodeURIComponent(ACCOUNT_NAME)}`;
+  try {
+    // Cancel any existing QR_GENERATED transactions for this user+listing to avoid stale codes
+    await pool.query(
+      "UPDATE payment_transactions SET status = 'CANCELLED' WHERE user_id = $1 AND listing_id = $2 AND status = 'QR_GENERATED'",
+      [userId, listingId]
+    );
 
-  return res.json({
-    qrUrl,
-    bankInfo: {
-      bank: "BIDV",
-      accountNumber: ACCOUNT_NUMBER,
-      accountName: ACCOUNT_NAME,
-    },
-    amount,
-    content,
-    packageType: pkg.type,
-    packageLabel: pkg.label,
-    durationDays: pkg.durationDays,
-  });
+    // Create a QR_GENERATED transaction to reserve a unique code
+    const transaction = await createTransaction({
+      userId,
+      listingId,
+      amount,
+      packageName: pkg.label,
+      status: "QR_GENERATED",
+    });
+
+    const content = transaction.code!;
+    const qrUrl = `https://img.vietqr.io/image/${BANK_CODE}-${ACCOUNT_NUMBER}-compact2.png?amount=${amount}&addInfo=${content}&accountName=${encodeURIComponent(ACCOUNT_NAME)}`;
+
+    return res.json({
+      qrUrl,
+      bankInfo: {
+        bank: "BIDV",
+        accountNumber: ACCOUNT_NUMBER,
+        accountName: ACCOUNT_NAME,
+      },
+      amount,
+      content,
+      packageType: pkg.type,
+      packageLabel: pkg.label,
+      durationDays: pkg.durationDays,
+    });
+  } catch (error) {
+    console.error("Generate QR error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 }
 
 export async function confirmTransfer(req: Request, res: Response) {
@@ -72,20 +90,36 @@ export async function confirmTransfer(req: Request, res: Response) {
       return res.status(404).json({ message: "Listing not found or access denied" });
     }
 
-    // Create pending transaction
-    const transaction = await createTransaction({
-      userId,
-      listingId,
-      amount,
-      packageName,
-      status: "PENDING",
-    });
+    // Find the QR_GENERATED transaction created when QR was generated
+    const qrTxnRes = await pool.query<PaymentTransactionRecord>(
+      "SELECT * FROM payment_transactions WHERE user_id = $1 AND listing_id = $2 AND amount = $3 AND status = 'QR_GENERATED' ORDER BY created_at DESC LIMIT 1",
+      [userId, listingId, amount]
+    );
+
+    let transaction: PaymentTransactionRecord;
+    if (qrTxnRes.rows.length > 0) {
+      // Promote existing QR_GENERATED to PENDING (keeps the same code)
+      const updated = await pool.query<PaymentTransactionRecord>(
+        "UPDATE payment_transactions SET status = 'PENDING' WHERE id = $1 RETURNING *",
+        [qrTxnRes.rows[0].id]
+      );
+      transaction = updated.rows[0];
+    } else {
+      // Fallback: create a fresh PENDING transaction
+      transaction = await createTransaction({
+        userId,
+        listingId,
+        amount,
+        packageName,
+        status: "PENDING",
+      });
+    }
 
     // Notify admins about new pending payment
     await notifyAllAdmins({
       type: "new_pending_payment",
       title: "Yêu cầu thanh toán mới",
-      message: `Người dùng đã chuyển khoản ${amount.toLocaleString()}đ cho gói "${packageName}". Vui lòng kiểm tra và xác nhận.`,
+      message: `Người dùng đã chuyển khoản ${amount.toLocaleString()}đ cho gói "${packageName}" (mã: ${transaction.code}). Vui lòng kiểm tra và xác nhận.`,
       listingId,
     });
 
