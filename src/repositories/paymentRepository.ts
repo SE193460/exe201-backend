@@ -46,6 +46,7 @@ export async function listTransactionsByUser(
     SELECT
 
     pt.id,
+    pt.listing_id as "listingId",
     pt.amount,
     pt.package_name as "packageName",
     pt.status,
@@ -83,6 +84,7 @@ export async function listPendingTransactions() {
   const result = await pool.query(
     `SELECT
       pt.id,
+      pt.listing_id as "listingId",
       pt.amount,
       pt.package_name as "packageName",
       pt.status,
@@ -110,6 +112,7 @@ export async function listAllTransactions() {
     SELECT
 
     pt.id,
+    pt.listing_id as "listingId",
     pt.amount,
     pt.package_name as "packageName",
     pt.status,

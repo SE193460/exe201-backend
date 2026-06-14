@@ -12,7 +12,7 @@ const PACKAGE_CONFIG: Record<number, { type: string; label: string; durationDays
 
 const BANK_CODE = "BIDV";
 const ACCOUNT_NUMBER = "6522516046";
-const ACCOUNT_NAME = "Pham Thi Kim Huong";
+const ACCOUNT_NAME = "Phạm Thị Kim Hương";
 
 export async function generateQR(req: Request, res: Response) {
   const userId = req.user?.id;
