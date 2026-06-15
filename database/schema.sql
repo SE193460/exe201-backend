@@ -279,6 +279,14 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Create feedbacks table
+CREATE TABLE IF NOT EXISTS feedbacks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Create listing_promotions table
 CREATE TABLE IF NOT EXISTS listing_promotions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

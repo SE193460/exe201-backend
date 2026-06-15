@@ -16,6 +16,7 @@ import { ensureAdminAccount } from "./services/adminBootstrap";
 import lifestyleRouter from "./routers/lifestyleRouter";
 import reportRouter from "./routers/reportRouter.ts";
 import notificationRouter from "./routers/notificationRouter";
+import feedbackRouter from "./routers/feedbackRouter";
 
 dotenv.config();
 
@@ -62,6 +63,7 @@ app.use("/api/users", userRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/listings", listingRouter);
 app.use("/api/amenities", amenityRouter);
+app.use("/api/feedback", feedbackRouter);
 app.use("/api", lifestyleRouter);
 app.use("/api/payments", paymentRouter);
 app.use("/api/reports", reportRouter);

@@ -16,6 +16,7 @@ import {
   getReports,
   resolveReportHandler,
 } from "../controllers/adminController";
+import { getAdminFeedbacks } from "../controllers/feedbackController";
 import {
   listAdminAmenities,
   createAdminAmenity,
@@ -49,5 +50,7 @@ router.delete("/amenities/:id", requireAuth, requireAdmin, deleteAdminAmenity);
 
 router.get("/reports", requireAuth, requireAdmin, getReports);
 router.patch("/reports/:id/resolve", requireAuth, requireAdmin, resolveReportHandler);
+
+router.get("/feedbacks", requireAuth, requireAdmin, getAdminFeedbacks);
 
 export default router;
