@@ -440,6 +440,21 @@ export async function findPublicApprovedListingById(id: string, currentUserId?: 
   return result.rows[0] || null;
 }
 
+export async function findListingBySource(source: string, excludeListingId?: string): Promise<ListingRecord | null> {
+  const normalizedSource = source.trim().toLowerCase();
+  const result = await pool.query<ListingRecord>(
+    `SELECT *
+     FROM listings
+     WHERE source IS NOT NULL
+       AND TRIM(source) != ''
+       AND LOWER(TRIM(source)) = $1
+       AND ($2::uuid IS NULL OR id != $2)
+     LIMIT 1`,
+    [normalizedSource, excludeListingId ?? null]
+  );
+  return result.rows[0] || null;
+}
+
 export async function listAllListingsForAdmin(): Promise<ListingRecord[]> {
   const result = await pool.query<ListingRecord>(
     `SELECT listings.*,

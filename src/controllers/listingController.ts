@@ -10,6 +10,7 @@ import {
   expireApprovedImportedListings,
   listPublicApprovedListings,
   findPublicApprovedListingById,
+  findAdminImportedListingById,
   deleteListingImageById,
   toggleSaveListing,
   listSavedListings,
@@ -17,6 +18,7 @@ import {
 } from "../repositories/listingRepository";
 import { addAmenitiesToListing, listAmenitiesByIds, setListingAmenities } from "../repositories/amenityRepository";
 import { uploadImage } from "../services/cloudinaryService";
+import { findUserWithRoleById } from "../repositories/userRepository";
 
 function serializeListing(listing: ListingRecord) {
   return {
@@ -312,7 +314,13 @@ export async function getPublicListingDetail(req: Request, res: Response) {
   const userId = req.user?.id;
   const rawId = req.params.id;
   const listingId = Array.isArray(rawId) ? rawId[0] : rawId;
-  const listing = await findPublicApprovedListingById(listingId, userId);
+  let listing = await findPublicApprovedListingById(listingId, userId);
+  if (!listing && userId) {
+    const user = await findUserWithRoleById(userId);
+    if (user?.role_name === "admin") {
+      listing = await findAdminImportedListingById(listingId);
+    }
+  }
   if (!listing) {
     return res.status(404).json({ message: "Listing not found" });
   }

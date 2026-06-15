@@ -5,6 +5,7 @@ import {
   updateListingStatusByAdmin,
   listAdminImportedListings,
   findAdminImportedListingById,
+  findListingBySource,
   createAdminImportedListing,
   updateAdminImportedListing,
   publishAdminImportedListing,
@@ -228,29 +229,42 @@ export async function createAdminImportedListingHandler(req: Request, res: Respo
     return res.status(400).json({ message: "Missing required fields (title, description, rentPrice, district, source)" });
   }
 
+  const duplicateSource = await findListingBySource(String(source));
+  if (duplicateSource) {
+    return res.status(409).json({ message: "Link bài đăng gốc đã tồn tại trong hệ thống" });
+  }
+
   const normalizedAmenityIds = Array.isArray(amenityIds)
     ? Array.from(new Set((amenityIds as unknown[]).filter((id): id is string => typeof id === "string")))
     : [];
 
-  const listing = await createAdminImportedListing({
-    ownerId: adminId,
-    title: title as string,
-    description: description as string,
-    rentPrice: rentPrice as number,
-    city: typeof city === "string" ? city : null,
-    district: district as string,
-    ward: typeof ward === "string" ? ward : null,
-    address: typeof address === "string" ? address : null,
-    availableFrom: typeof availableFrom === "string" ? availableFrom : null,
-    preferredGender: typeof preferredGender === "string" ? preferredGender : null,
-    roomType: typeof roomType === "string" ? roomType : null,
-    roomAreaSqm: typeof roomAreaSqm === "number" ? roomAreaSqm : null,
-    maxOccupants: typeof maxOccupants === "number" ? maxOccupants : null,
-    currentOccupants: typeof currentOccupants === "number" ? currentOccupants : 0,
-    smokingAllowed: typeof smokingAllowed === "boolean" ? smokingAllowed : false,
-    petAllowed: typeof petAllowed === "boolean" ? petAllowed : false,
-    source: source as string,
-  });
+  let listing;
+  try {
+    listing = await createAdminImportedListing({
+      ownerId: adminId,
+      title: title as string,
+      description: description as string,
+      rentPrice: rentPrice as number,
+      city: typeof city === "string" ? city : null,
+      district: district as string,
+      ward: typeof ward === "string" ? ward : null,
+      address: typeof address === "string" ? address : null,
+      availableFrom: typeof availableFrom === "string" ? availableFrom : null,
+      preferredGender: typeof preferredGender === "string" ? preferredGender : null,
+      roomType: typeof roomType === "string" ? roomType : null,
+      roomAreaSqm: typeof roomAreaSqm === "number" ? roomAreaSqm : null,
+      maxOccupants: typeof maxOccupants === "number" ? maxOccupants : null,
+      currentOccupants: typeof currentOccupants === "number" ? currentOccupants : 0,
+      smokingAllowed: typeof smokingAllowed === "boolean" ? smokingAllowed : false,
+      petAllowed: typeof petAllowed === "boolean" ? petAllowed : false,
+      source: source as string,
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code === "23505") {
+      return res.status(409).json({ message: "Link bài đăng gốc đã tồn tại trong hệ thống" });
+    }
+    throw error;
+  }
 
   if (normalizedAmenityIds.length > 0) {
     await addAmenitiesToListing(listing.id, normalizedAmenityIds);
@@ -286,25 +300,38 @@ export async function updateAdminImportedListingHandler(req: Request, res: Respo
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  const updated = await updateAdminImportedListing({
-    listingId: id,
-    title: title as string,
-    description: description as string,
-    rentPrice: rentPrice as number,
-    city: typeof city === "string" ? city : null,
-    district: district as string,
-    ward: typeof ward === "string" ? ward : null,
-    address: typeof address === "string" ? address : null,
-    availableFrom: typeof availableFrom === "string" ? availableFrom : null,
-    preferredGender: typeof preferredGender === "string" ? preferredGender : null,
-    roomType: typeof roomType === "string" ? roomType : null,
-    roomAreaSqm: typeof roomAreaSqm === "number" ? roomAreaSqm : null,
-    maxOccupants: typeof maxOccupants === "number" ? maxOccupants : null,
-    currentOccupants: typeof currentOccupants === "number" ? currentOccupants : 0,
-    smokingAllowed: typeof smokingAllowed === "boolean" ? smokingAllowed : false,
-    petAllowed: typeof petAllowed === "boolean" ? petAllowed : false,
-    source: source as string,
-  });
+  const duplicateSource = await findListingBySource(String(source), id);
+  if (duplicateSource) {
+    return res.status(409).json({ message: "Link bài đăng gốc đã tồn tại trong hệ thống" });
+  }
+
+  let updated;
+  try {
+    updated = await updateAdminImportedListing({
+      listingId: id,
+      title: title as string,
+      description: description as string,
+      rentPrice: rentPrice as number,
+      city: typeof city === "string" ? city : null,
+      district: district as string,
+      ward: typeof ward === "string" ? ward : null,
+      address: typeof address === "string" ? address : null,
+      availableFrom: typeof availableFrom === "string" ? availableFrom : null,
+      preferredGender: typeof preferredGender === "string" ? preferredGender : null,
+      roomType: typeof roomType === "string" ? roomType : null,
+      roomAreaSqm: typeof roomAreaSqm === "number" ? roomAreaSqm : null,
+      maxOccupants: typeof maxOccupants === "number" ? maxOccupants : null,
+      currentOccupants: typeof currentOccupants === "number" ? currentOccupants : 0,
+      smokingAllowed: typeof smokingAllowed === "boolean" ? smokingAllowed : false,
+      petAllowed: typeof petAllowed === "boolean" ? petAllowed : false,
+      source: source as string,
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code === "23505") {
+      return res.status(409).json({ message: "Link bài đăng gốc đã tồn tại trong hệ thống" });
+    }
+    throw error;
+  }
 
   if (!updated) return res.status(404).json({ message: "Imported listing not found" });
 
