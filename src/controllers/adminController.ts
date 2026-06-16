@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { pool } from "../config/db";
 import { listUsers, findUserWithRoleById, toggleUserActive } from "../repositories/userRepository";
 import {
   listAllListingsForAdmin,
@@ -121,6 +122,172 @@ export async function getAdminListings(req: Request, res: Response) {
       ownerAvatar: listing.owner_avatar,
     }))
   );
+}
+
+export async function getAdminDashboard(req: Request, res: Response) {
+  try {
+    const [userStatsRes, listingStatsRes, reportStatsRes, paymentStatsRes, userGrowthWeeklyRes, revenueTrendWeeklyRes, userGrowthYearlyRes, revenueTrendYearlyRes, topImportSourcesRes, recentPaymentsRes, recentReportsRes] =
+      await Promise.all([
+        pool.query(
+          `SELECT
+            COUNT(*)::int AS total_users,
+            COUNT(*) FILTER (WHERE is_active) AS active_users,
+            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') AS new_users_last_7d,
+            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '14 days' AND created_at < NOW() - INTERVAL '7 days') AS new_users_prev_7d
+          FROM users`
+        ),
+        pool.query(
+          `SELECT
+            COUNT(*) FILTER (WHERE (source IS NULL OR TRIM(source) = '') AND status = 'APPROVED' AND published_at IS NOT NULL)::int AS total_listings,
+            COUNT(*) FILTER (WHERE status = 'PENDING')::int AS pending_listings,
+            COUNT(*) FILTER (WHERE status = 'REJECTED')::int AS rejected_listings,
+            COUNT(*) FILTER (WHERE status = 'APPROVED')::int AS approved_listings,
+            COUNT(*) FILTER (WHERE (source IS NOT NULL AND TRIM(source) != '') AND status = 'APPROVED' AND published_at IS NOT NULL)::int AS imported_listings,
+            COUNT(DISTINCT source) FILTER (WHERE source IS NOT NULL AND TRIM(source) != '')::int AS imported_source_count
+          FROM listings`
+        ),
+        pool.query(
+          `SELECT
+            COUNT(*)::int AS total_reports,
+            COUNT(*) FILTER (WHERE status != 'RESOLVED')::int AS unresolved_reports,
+            COUNT(*) FILTER (WHERE status = 'RESOLVED')::int AS resolved_reports
+          FROM listing_reports`
+        ),
+        pool.query(
+          `SELECT
+            COALESCE(SUM(amount) FILTER (WHERE status = 'COMPLETED'), 0)::int AS total_revenue,
+            COALESCE(SUM(amount) FILTER (WHERE status = 'PENDING'), 0)::int AS pending_revenue,
+            COUNT(*) FILTER (WHERE status = 'COMPLETED')::int AS completed_transactions,
+            COUNT(*) FILTER (WHERE status = 'PENDING')::int AS pending_transactions,
+            COALESCE(SUM(amount) FILTER (WHERE status = 'COMPLETED' AND created_at >= NOW() - INTERVAL '30 days'), 0)::int AS revenue_last_30d,
+            COALESCE(SUM(amount) FILTER (WHERE status = 'COMPLETED' AND created_at >= NOW() - INTERVAL '7 days'), 0)::int AS revenue_last_7d,
+            COALESCE(SUM(amount) FILTER (WHERE status = 'COMPLETED' AND created_at >= NOW() - INTERVAL '14 days' AND created_at < NOW() - INTERVAL '7 days'), 0)::int AS revenue_prev_7d
+          FROM payment_transactions`
+        ),
+        pool.query(
+          `SELECT
+            EXTRACT(DAY FROM day)::text AS day,
+            COALESCE(COUNT(u.*), 0)::int AS new_users
+          FROM generate_series(
+            date_trunc('month', NOW()),
+            date_trunc('month', NOW()) + INTERVAL '1 month' - INTERVAL '1 day',
+            INTERVAL '1 day'
+          ) AS day
+          LEFT JOIN users u ON date_trunc('day', u.created_at) = day
+          GROUP BY EXTRACT(DAY FROM day)
+          ORDER BY EXTRACT(DAY FROM day)`
+        ),
+        pool.query(
+          `SELECT
+            EXTRACT(DAY FROM day)::text AS day,
+            COALESCE(SUM(pt.amount) FILTER (WHERE pt.status = 'COMPLETED'), 0)::int AS revenue
+          FROM generate_series(
+            date_trunc('month', NOW()),
+            date_trunc('month', NOW()) + INTERVAL '1 month' - INTERVAL '1 day',
+            INTERVAL '1 day'
+          ) AS day
+          LEFT JOIN payment_transactions pt ON date_trunc('day', pt.created_at) = day
+          GROUP BY EXTRACT(DAY FROM day)
+          ORDER BY EXTRACT(DAY FROM day)`
+        ),
+        pool.query(
+          `SELECT
+            TO_CHAR(month, 'MM') AS month,
+            COALESCE(COUNT(u.*), 0)::int AS new_users
+          FROM generate_series(
+            date_trunc('year', NOW()),
+            date_trunc('year', NOW()) + INTERVAL '1 year' - INTERVAL '1 day',
+            INTERVAL '1 month'
+          ) AS month
+          LEFT JOIN users u ON date_trunc('month', u.created_at) = month AND EXTRACT(YEAR FROM u.created_at) = EXTRACT(YEAR FROM NOW())
+          GROUP BY month
+          ORDER BY month`
+        ),
+        pool.query(
+          `SELECT
+            TO_CHAR(month, 'MM') AS month,
+            COALESCE(SUM(pt.amount) FILTER (WHERE pt.status = 'COMPLETED'), 0)::int AS revenue
+          FROM generate_series(
+            date_trunc('year', NOW()),
+            date_trunc('year', NOW()) + INTERVAL '1 year' - INTERVAL '1 day',
+            INTERVAL '1 month'
+          ) AS month
+          LEFT JOIN payment_transactions pt ON date_trunc('month', pt.created_at) = month AND EXTRACT(YEAR FROM pt.created_at) = EXTRACT(YEAR FROM NOW())
+          GROUP BY month
+          ORDER BY month`
+        ),
+        pool.query(
+          `SELECT source, COUNT(*)::int AS count
+          FROM listings
+          WHERE source IS NOT NULL AND TRIM(source) != ''
+          GROUP BY source
+          ORDER BY count DESC
+          LIMIT 5`
+        ),
+        pool.query(
+          `SELECT
+            pt.id,
+            pt.code,
+            pt.amount,
+            pt.package_name AS package_name,
+            pt.status,
+            pt.created_at,
+            pt.listing_id AS listing_id,
+            l.title AS listing_title,
+            u.full_name AS user_name,
+            u.email AS user_email
+          FROM payment_transactions pt
+          LEFT JOIN listings l ON l.id = pt.listing_id
+          LEFT JOIN users u ON u.id = pt.user_id
+          WHERE pt.status IN ('PENDING', 'COMPLETED')
+          ORDER BY pt.created_at DESC
+          LIMIT 5`
+        ),
+        pool.query(
+          `SELECT
+            lr.id,
+            lr.status,
+            lr.reason,
+            lr.description,
+            lr.created_at,
+            lr.listing_id,
+            l.title AS listing_title,
+            u.full_name AS reporter_name,
+            u.email AS reporter_email
+          FROM listing_reports lr
+          LEFT JOIN listings l ON l.id = lr.listing_id
+          LEFT JOIN users u ON u.id = lr.reporter_id
+          ORDER BY lr.created_at DESC
+          LIMIT 5`
+        ),
+      ]);
+
+    const userStats = userStatsRes.rows[0];
+    const listingStats = listingStatsRes.rows[0];
+    const reportStats = reportStatsRes.rows[0];
+    const paymentStats = paymentStatsRes.rows[0];
+    const userGrowthWeekly = userGrowthWeeklyRes.rows;
+    const revenueTrendWeekly = revenueTrendWeeklyRes.rows;
+    const userGrowthYearly = userGrowthYearlyRes.rows;
+    const revenueTrendYearly = revenueTrendYearlyRes.rows;
+
+    return res.json({
+      userStats,
+      listingStats,
+      reportStats,
+      paymentStats,
+      userGrowthWeekly,
+      revenueTrendWeekly,
+      userGrowthYearly,
+      revenueTrendYearly,
+      topImportSources: topImportSourcesRes.rows,
+      recentPayments: recentPaymentsRes.rows,
+      recentReports: recentReportsRes.rows,
+    });
+  } catch (error) {
+    console.error("Fetch admin dashboard error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 }
 
 export async function approveListing(req: Request, res: Response) {

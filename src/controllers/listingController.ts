@@ -12,6 +12,7 @@ import {
   findPublicApprovedListingById,
   findAdminImportedListingById,
   deleteListingImageById,
+  deleteListingByIdAndOwner,
   toggleSaveListing,
   listSavedListings,
   createReport,
@@ -349,6 +350,28 @@ export async function deleteMyListingImage(req: Request, res: Response) {
   }
 
   return res.json({ message: "Image deleted successfully", imageId, listingId });
+}
+
+export async function deleteMyListing(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const rawId = req.params.id;
+  const listingId = Array.isArray(rawId) ? rawId[0] : rawId;
+
+  const listing = await findListingByIdAndOwner(listingId, userId);
+  if (!listing) {
+    return res.status(404).json({ message: "Listing not found" });
+  }
+
+  const deleted = await deleteListingByIdAndOwner(listingId, userId);
+  if (!deleted) {
+    return res.status(404).json({ message: "Listing not found" });
+  }
+
+  return res.json({ message: "Listing deleted successfully" });
 }
 
 export async function addListingImageUrls(req: Request, res: Response) {

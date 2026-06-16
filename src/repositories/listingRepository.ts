@@ -555,6 +555,14 @@ export async function deleteListingImageById(imageId: string, listingId: string)
   return (result.rowCount ?? 0) > 0;
 }
 
+export async function deleteListingByIdAndOwner(listingId: string, ownerId: string): Promise<boolean> {
+  const result = await pool.query(
+    "DELETE FROM listings WHERE id = $1 AND owner_id = $2 RETURNING id",
+    [listingId, ownerId]
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
 // --- Admin-imported listings ---
 
 export async function createAdminImportedListing(params: {

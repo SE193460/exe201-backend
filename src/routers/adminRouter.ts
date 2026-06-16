@@ -14,6 +14,7 @@ import {
   unpublishAdminImportedListingHandler,
   addAdminImportedListingImageUrls,
   getReports,
+  getAdminDashboard,
   resolveReportHandler,
 } from "../controllers/adminController";
 import { getAdminFeedbacks } from "../controllers/feedbackController";
@@ -50,6 +51,7 @@ router.delete("/amenities/:id", requireAuth, requireAdmin, deleteAdminAmenity);
 
 router.get("/reports", requireAuth, requireAdmin, getReports);
 router.patch("/reports/:id/resolve", requireAuth, requireAdmin, resolveReportHandler);
+router.get("/dashboard", requireAuth, requireAdmin, getAdminDashboard);
 
 router.get("/feedbacks", requireAuth, requireAdmin, getAdminFeedbacks);
 
