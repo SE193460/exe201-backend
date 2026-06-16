@@ -12,6 +12,7 @@ import {
 	deleteMyListingImage,
 	deleteMyListing,
 	addListingImageUrls,
+	unpublishMyListing,
 } from "../controllers/listingController";
 import { changeMyPassword, getMe, updateMe, uploadAvatar } from "../controllers/userController";
 import { requireAuth } from "../middlewares/authMiddleware";
@@ -67,6 +68,7 @@ router.put("/me/listings/:id", requireAuth, updateMyListing);
 router.delete("/me/listings/:id", requireAuth, deleteMyListing);
 router.post("/me/listings/:id/images", requireAuth, listingUpload.array("images", 20), uploadMyListingImages);
 router.put("/me/listings/:id/submit", requireAuth, submitMyListing);
+router.put("/me/listings/:id/unpublish", requireAuth, unpublishMyListing);
 router.delete("/me/listings/:id/images/:imageId", requireAuth, deleteMyListingImage);
 router.post("/me/listings/:id/images/urls", requireAuth, addListingImageUrls);
 

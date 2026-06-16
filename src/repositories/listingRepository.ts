@@ -563,6 +563,52 @@ export async function deleteListingByIdAndOwner(listingId: string, ownerId: stri
   return (result.rowCount ?? 0) > 0;
 }
 
+export async function unpublishListingByIdAndOwner(listingId: string, ownerId: string): Promise<ListingRecord | null> {
+  const result = await pool.query<ListingRecord>(
+    `UPDATE listings
+     SET status = 'DRAFT', published_at = NULL, updated_at = NOW()
+     WHERE id = $1 AND owner_id = $2 AND status = 'APPROVED'
+     RETURNING *`,
+    [listingId, ownerId]
+  );
+  if (result.rows.length === 0) return null;
+
+  const fullResult = await pool.query<ListingRecord>(
+    `SELECT listings.*,
+            users.full_name AS owner_name,
+            users.phone_number AS owner_phone,
+            users.avatar_url AS owner_avatar,
+            users.email AS owner_email,
+            COALESCE(
+              json_agg(
+                json_build_object(
+                  'id', listing_images.id,
+                  'listing_id', listing_images.listing_id,
+                  'image_url', listing_images.image_url,
+                  'display_order', listing_images.display_order,
+                  'created_at', listing_images.created_at
+                ) ORDER BY listing_images.display_order
+              ) FILTER (WHERE listing_images.id IS NOT NULL),
+              '[]'
+            ) AS images,
+            (
+              SELECT COALESCE(
+                json_agg(json_build_object('id', a.id, 'name', a.name) ORDER BY a.name),
+                '[]'::json
+              ) FROM listing_amenity la
+              JOIN amenities a ON a.id = la.amenity_id
+              WHERE la.listing_id = listings.id
+            ) AS amenities
+     FROM listings
+     LEFT JOIN users ON users.id = listings.owner_id
+     LEFT JOIN listing_images ON listing_images.listing_id = listings.id
+     WHERE listings.id = $1
+     GROUP BY listings.id, users.id`,
+    [listingId]
+  );
+  return fullResult.rows[0] || null;
+}
+
 // --- Admin-imported listings ---
 
 export async function createAdminImportedListing(params: {

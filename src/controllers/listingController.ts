@@ -13,6 +13,7 @@ import {
   findAdminImportedListingById,
   deleteListingImageById,
   deleteListingByIdAndOwner,
+  unpublishListingByIdAndOwner,
   toggleSaveListing,
   listSavedListings,
   createReport,
@@ -441,5 +442,22 @@ export async function reportListing(req: Request, res: Response) {
     description: description || null,
   });
   return res.status(201).json({ message: "Báo cáo bài đăng thành công!", report });
+}
+
+export async function unpublishMyListing(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const rawId = req.params.id;
+  const listingId = Array.isArray(rawId) ? rawId[0] : rawId;
+
+  const unpublished = await unpublishListingByIdAndOwner(listingId, userId);
+  if (!unpublished) {
+    return res.status(404).json({ message: "Listing not found or not in APPROVED status" });
+  }
+
+  return res.json(serializeListing(unpublished));
 }
 
