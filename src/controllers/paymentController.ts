@@ -10,11 +10,6 @@ const PACKAGE_CONFIG: Record<number, { type: string; label: string; durationDays
   15000: { type: "premium", label: "Gói 15.000đ", durationDays: 7 },
 };
 
-const TRANSFER_PREFIX: Record<number, string> = {
-  5000: "ROOMIE5K_",
-  15000: "ROOMIE15K_",
-};
-
 const MOMO_PHONE = "0704542270";
 const MOMO_NAME = "Luong Anh Mai";
 
@@ -43,7 +38,7 @@ export async function generateQR(req: Request, res: Response) {
       [userId, listingId]
     );
 
-    // Create a QR_GENERATED transaction to reserve a unique code
+    // Create a QR_GENERATED transaction with auto-generated payment code
     const transaction = await createTransaction({
       userId,
       listingId,
@@ -52,11 +47,11 @@ export async function generateQR(req: Request, res: Response) {
       status: "QR_GENERATED",
     });
 
-    const code = shortCode(listingId);
-    const content = `${TRANSFER_PREFIX[amount]}${code}`;
+    const paymentCode = transaction.code || "RM000000";
+    const listingCode = shortCode(listingId);
 
     // VietQR — works with any banking app, recipient is Momo account
-    const qrUrl = `https://img.vietqr.io/image/MOMO-${MOMO_PHONE}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(content)}&accountName=${encodeURIComponent(MOMO_NAME)}`;
+    const qrUrl = `https://img.vietqr.io/image/MOMO-${MOMO_PHONE}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(paymentCode)}&accountName=${encodeURIComponent(MOMO_NAME)}`;
 
     return res.json({
       qrUrl,
@@ -65,10 +60,10 @@ export async function generateQR(req: Request, res: Response) {
         phone: MOMO_PHONE,
       },
       amount,
-      content,
-      code,
-      syntax: `${TRANSFER_PREFIX[amount]}[Mã tin đăng]`,
-      example: `ROOMIE5K_${code}`,
+      content: paymentCode,
+      code: listingCode,
+      syntax: "Mã giao dịch",
+      example: paymentCode,
       packageType: pkg.type,
       packageLabel: pkg.label,
       durationDays: pkg.durationDays,
