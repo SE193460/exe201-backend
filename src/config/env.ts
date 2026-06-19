@@ -28,6 +28,20 @@ function requireEnv(name: string): string {
   return value;
 }
 
+function getBackendUrl(): string {
+  if (process.env.BACKEND_URL) {
+    return process.env.BACKEND_URL;
+  }
+  
+  // For production, BACKEND_URL must be explicitly set
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Missing required env var: BACKEND_URL (must be set for production)");
+  }
+  
+  // For development only
+  return `http://localhost:${Number(process.env.PORT) || 3000}`;
+}
+
 export const env: Env = {
   port: Number(process.env.PORT) || 3000,
   databaseUrl: requireEnv("DATABASE_URL"),
@@ -36,7 +50,7 @@ export const env: Env = {
   googleClientSecret: requireEnv("GOOGLE_CLIENT_SECRET"),
   frontendUrl: requireEnv("FRONTEND_URL"),
   resendApiKey: requireEnv("RESEND_API_KEY"),
-  backendUrl: process.env.BACKEND_URL || `http://localhost:${Number(process.env.PORT) || 3000}`,
+  backendUrl: getBackendUrl(),
   nodeEnv: process.env.NODE_ENV || "development",
   adminEmail: process.env.ADMIN_EMAIL || null,
   adminPassword: process.env.ADMIN_PASSWORD || null,
