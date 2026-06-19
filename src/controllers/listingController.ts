@@ -312,7 +312,6 @@ export async function getPublicListings(req: Request, res: Response) {
 }
 
 export async function getPublicListingDetail(req: Request, res: Response) {
-  await expireApprovedImportedListings(30);
   const userId = req.user?.id;
   const rawId = req.params.id;
   const listingId = Array.isArray(rawId) ? rawId[0] : rawId;
