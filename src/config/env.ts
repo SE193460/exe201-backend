@@ -29,8 +29,11 @@ function requireEnv(name: string): string {
 }
 
 function getBackendUrl(): string {
-  if (process.env.BACKEND_URL) {
-    return process.env.BACKEND_URL;
+  let url = process.env.BACKEND_URL;
+  
+  if (url) {
+    // Remove trailing slash to avoid double slashes in callback URL
+    return url.endsWith('/') ? url.slice(0, -1) : url;
   }
   
   // For production, BACKEND_URL must be explicitly set
