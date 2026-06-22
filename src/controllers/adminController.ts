@@ -12,6 +12,7 @@ import {
   publishAdminImportedListing,
   unpublishAdminImportedListing,
   addListingImages,
+  deleteListingImageById,
   listAllReports,
   resolveReport,
 } from "../repositories/listingRepository";
@@ -546,6 +547,19 @@ export async function addAdminImportedListingImageUrls(req: Request, res: Respon
     listingId: id,
     images: images.map((img) => ({ id: img.id, imageUrl: img.image_url, displayOrder: img.display_order })),
   });
+}
+
+export async function deleteAdminImportedListingImage(req: Request, res: Response) {
+  const listingId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const imageId = Array.isArray(req.params.imageId) ? req.params.imageId[0] : req.params.imageId;
+  
+  const listing = await findAdminImportedListingById(listingId);
+  if (!listing) return res.status(404).json({ message: "Listing not found" });
+  
+  const success = await deleteListingImageById(imageId, listingId);
+  if (!success) return res.status(404).json({ message: "Image not found" });
+  
+  return res.json({ message: "Image deleted successfully", listingId, imageId });
 }
 
 export async function getReports(req: Request, res: Response) {

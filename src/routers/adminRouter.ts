@@ -13,6 +13,7 @@ import {
   publishAdminImportedListingHandler,
   unpublishAdminImportedListingHandler,
   addAdminImportedListingImageUrls,
+  deleteAdminImportedListingImage,
   getReports,
   getAdminDashboard,
   resolveReportHandler,
@@ -43,6 +44,7 @@ router.put("/imported-listings/:id", requireAuth, requireAdmin, updateAdminImpor
 router.patch("/imported-listings/:id/publish", requireAuth, requireAdmin, publishAdminImportedListingHandler);
 router.patch("/imported-listings/:id/unpublish", requireAuth, requireAdmin, unpublishAdminImportedListingHandler);
 router.post("/imported-listings/:id/images/urls", requireAuth, requireAdmin, addAdminImportedListingImageUrls);
+router.delete("/imported-listings/:id/images/:imageId", requireAuth, requireAdmin, deleteAdminImportedListingImage);
 
 router.get("/amenities", requireAuth, requireAdmin, listAdminAmenities);
 router.post("/amenities", requireAuth, requireAdmin, createAdminAmenity);
