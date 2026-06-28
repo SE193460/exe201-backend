@@ -296,3 +296,16 @@ CREATE TABLE IF NOT EXISTS listing_promotions (
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Create analytics_events table
+CREATE TABLE IF NOT EXISTS analytics_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    event_name TEXT NOT NULL,
+    event_type TEXT NOT NULL DEFAULT 'interaction',
+    listing_id UUID REFERENCES listings(id) ON DELETE SET NULL,
+    district TEXT,
+    source TEXT,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

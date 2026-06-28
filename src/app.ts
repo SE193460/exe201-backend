@@ -17,6 +17,7 @@ import lifestyleRouter from "./routers/lifestyleRouter";
 import reportRouter from "./routers/reportRouter";
 import notificationRouter from "./routers/notificationRouter";
 import feedbackRouter from "./routers/feedbackRouter";
+import analyticsRouter from "./routers/analyticsRouter";
 
 dotenv.config();
 
@@ -79,6 +80,7 @@ app.use("/api", lifestyleRouter);
 app.use("/api/payments", paymentRouter);
 app.use("/api/reports", reportRouter);
 app.use("/api/notifications", notificationRouter);
+app.use("/api/analytics", analyticsRouter);
 
 const PORT = process.env.PORT || 3000;
 
