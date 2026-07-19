@@ -41,6 +41,6 @@
     "@types/pg": "^8.20.0",
     "dbmate": "^2.33.0",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.9.2"
+    "typescript": "5.9.2"
   }
 }
