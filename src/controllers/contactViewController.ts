@@ -26,7 +26,7 @@ export async function viewContact(req: Request, res: Response) {
     if (!success) return res.status(403).json({ error: "Insufficient contact views", remaining: 0 });
 
     const result = await pool.query(
-      `SELECT u.phone, u.full_name AS owner_name
+      `SELECT u.phone_number AS phone, u.full_name AS owner_name
        FROM listings l
        JOIN users u ON u.id = l.owner_id
        WHERE l.id = $1`,
