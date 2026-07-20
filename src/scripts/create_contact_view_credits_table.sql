@@ -7,8 +7,8 @@ CREATE TABLE IF NOT EXISTS user_contact_view_credits (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Add index
-CREATE INDEX IF NOT EXISTS idx_contact_view_credits_user_id ON user_contact_view_credits(user_id);
+-- Add unique constraint on user_id (needed for ON CONFLICT)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_contact_view_credits_user_id ON user_contact_view_credits(user_id);
 
 -- Give 3 free views to all existing users
 INSERT INTO user_contact_view_credits (user_id, remaining_views, used_free_views)
