@@ -5,6 +5,7 @@ import {
   updateMyLifestyleProfile,
   getMyRoommatePreferences,
   updateMyRoommatePreferences,
+  deleteMyRoommatePreferences,
 } from '../controllers/lifestyleController';
 import { softFilter } from '../controllers/softFilterController';
 
@@ -19,6 +20,7 @@ router.put('/lifestyle-profile',    updateMyLifestyleProfile);
 // Roommate preferences
 router.get('/roommate-preferences', getMyRoommatePreferences);
 router.put('/roommate-preferences', updateMyRoommatePreferences);
+router.delete('/roommate-preferences', deleteMyRoommatePreferences);
 
 // Soft filter
 router.post('/soft-filter', softFilter);

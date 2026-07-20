@@ -152,3 +152,7 @@ export async function upsertRoommatePreferences(
   );
   return result.rows[0];
 }
+
+export async function deleteRoommatePreferences(userId: string): Promise<void> {
+  await pool.query("DELETE FROM user_roommate_preferences WHERE user_id = $1", [userId]);
+}
