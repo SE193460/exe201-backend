@@ -16,32 +16,23 @@ export async function getContactViewCredits(userId: string) {
 }
 
 export async function deductContactView(userId: string, listingId: string): Promise<boolean> {
-  const client = await pool.connect();
   try {
-    await client.query("BEGIN");
-    const result = await client.query(
-      "SELECT remaining_views FROM user_contact_view_credits WHERE user_id = $1 FOR UPDATE",
+    const updateRes = await pool.query(
+      `UPDATE user_contact_view_credits
+       SET remaining_views = remaining_views - 1, updated_at = NOW()
+       WHERE user_id = $1 AND remaining_views > 0
+       RETURNING remaining_views`,
       [userId]
     );
-    if (result.rows.length === 0 || result.rows[0].remaining_views <= 0) {
-      await client.query("ROLLBACK");
-      return false;
-    }
-    await client.query(
-      "UPDATE user_contact_view_credits SET remaining_views = remaining_views - 1, updated_at = NOW() WHERE user_id = $1",
-      [userId]
-    );
-    await client.query(
+    if (updateRes.rows.length === 0) return false;
+
+    await pool.query(
       "INSERT INTO contact_view_log (user_id, listing_id) VALUES ($1, $2)",
       [userId, listingId]
     );
-    await client.query("COMMIT");
     return true;
   } catch (e) {
-    await client.query("ROLLBACK");
     throw e;
-  } finally {
-    client.release();
   }
 }
 
