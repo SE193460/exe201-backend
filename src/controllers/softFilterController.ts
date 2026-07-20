@@ -5,7 +5,11 @@ import {
   findNoRoomUsersWithProfile,
   HardFilters,
 } from '../repositories/softFilterRepository';
-import { getRoommatePreferences } from '../repositories/lifestyleRepository';
+import {
+  getRoommatePreferences,
+  getLifestyleProfile,
+  LifestyleProfileRecord,
+} from '../repositories/lifestyleRepository';
 import {
   calculateMatchScore,
   LifestyleProfile,
@@ -50,15 +54,44 @@ function toMatchPreferences(raw: Record<string, unknown> | null): RoommatePrefer
   };
 }
 
+function hasAnyPreference(prefs: Record<string, unknown> | null): boolean {
+  if (!prefs) return false;
+  const keys: (keyof RoommatePreferences)[] = [
+    'pref_cleanliness', 'pref_ac_usage', 'pref_cooking', 'pref_guest',
+    'pref_home_frequency', 'pref_noise', 'pref_call_frequency', 'pref_game_mic',
+    'pref_pet', 'pref_smoking', 'pref_work_schedule', 'pref_sharing',
+  ];
+  return keys.some((key) => prefs[key] != null);
+}
+
+function profileToPreferences(profile: LifestyleProfileRecord): Record<string, unknown> {
+  const sharingMap: Record<number, string> = { 1: 'OPEN', 2: 'ASK', 3: 'PRIVATE' };
+  return {
+    pref_cleanliness:    profile.cleanliness,
+    pref_ac_usage:       profile.ac_usage,
+    pref_cooking:        profile.cooking,
+    pref_guest:          profile.guest,
+    pref_home_frequency: profile.home_frequency,
+    pref_noise:          profile.noise,
+    pref_call_frequency: profile.call_frequency,
+    pref_game_mic:       profile.game_mic,
+    pref_pet:            profile.pet_status != null ? (profile.pet_status === 1 ? 'LOVE' : 'DISLIKE') : null,
+    pref_smoking:        profile.smoking_status != null ? (profile.smoking_status === 1 ? 'YES' : 'DISLIKE') : null,
+    pref_work_schedule:  profile.work_schedule,
+    pref_sharing:        profile.sharing != null ? (sharingMap[profile.sharing] ?? null) : null,
+  };
+}
+
 // ─── Controller ───────────────────────────────────────────────────────────────
 
 export async function softFilter(req: Request, res: Response) {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-  const { user_type, hard_filters } = req.body as {
+  const { user_type, hard_filters, use_lifestyle_profile } = req.body as {
     user_type: 'HAS_ROOM' | 'NO_ROOM';
     hard_filters?: HardFilters;
+    use_lifestyle_profile?: boolean;
   };
 
   if (user_type !== 'HAS_ROOM' && user_type !== 'NO_ROOM') {
@@ -66,7 +99,23 @@ export async function softFilter(req: Request, res: Response) {
   }
 
   // Lấy preferences của user hiện tại (dùng cho cả 2 mode)
-  const prefsRaw = await getRoommatePreferences(userId);
+  let prefsRaw: Record<string, unknown> | null = null;
+  let source: 'roommate_preferences' | 'lifestyle_profile' = 'roommate_preferences';
+
+  // Nếu không yêu cầu dùng lifestyle profile → lấy roommate_preferences trước
+  if (!use_lifestyle_profile) {
+    prefsRaw = await getRoommatePreferences(userId);
+  }
+
+  // Nếu chưa có bộ lọc mềm (hoặc được yêu cầu) → dùng hồ sơ lối sống làm mặc định
+  if (use_lifestyle_profile || !hasAnyPreference(prefsRaw)) {
+    const profile = await getLifestyleProfile(userId);
+    if (profile) {
+      prefsRaw = profileToPreferences(profile);
+      source = 'lifestyle_profile';
+    }
+  }
+
   const myPreferences = toMatchPreferences(prefsRaw as Record<string, unknown> | null);
 
   const filters: HardFilters = hard_filters ?? {};
@@ -100,7 +149,7 @@ export async function softFilter(req: Request, res: Response) {
       })
       .sort((a, b) => b.total_score - a.total_score);
 
-    return res.json({ results });
+    return res.json({ results, source });
   }
 
   // ── NO_ROOM mode ───────────────────────────────────────────────────────────
@@ -130,5 +179,5 @@ export async function softFilter(req: Request, res: Response) {
     })
     .sort((a, b) => b.total_score - a.total_score);
 
-  return res.json({ results });
+  return res.json({ results, source });
 }

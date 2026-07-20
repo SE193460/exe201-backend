@@ -4,6 +4,7 @@ import { createPromotion } from "../repositories/promotionRepository";
 import { createNotification, notifyAllAdmins } from "../repositories/notificationRepository";
 import { sendInvoiceEmail } from "../services/emailService";
 import { pool } from "../config/db";
+import * as contactViewRepo from "../repositories/contactViewRepository";
 
 const PACKAGE_CONFIG: Record<number, { type: string; label: string; durationDays: number }> = {
   5000: { type: "standard", label: "Gói 5.000đ", durationDays: 1 },
@@ -163,6 +164,24 @@ export async function adminConfirmPayment(req: Request, res: Response) {
     }
 
     const txn = txnRes.rows[0];
+
+    // Handle contact view credit packages
+    if (txn.package_name === "Gói 5 lượt xem" || txn.package_name === "Gói 10 lượt xem") {
+      const views = txn.package_name === "Gói 5 lượt xem" ? 5 : 10;
+      await pool.query(
+        "UPDATE payment_transactions SET status = 'COMPLETED' WHERE id = $1",
+        [transactionId]
+      );
+      const result = await contactViewRepo.addContactViewCredits(txn.user_id, views);
+      await createNotification({
+        userId: txn.user_id,
+        type: "payment_confirmed",
+        title: "Thanh toán thành công",
+        message: `Gói "${txn.package_name}" đã được xác nhận. Bạn đã được cộng ${views} lượt xem liên hệ.`,
+        listingId: null,
+      });
+      return res.json({ success: true, remaining: result.remaining_views, message: `Đã cộng ${views} lượt xem liên hệ` });
+    }
 
     // Get listing details
     const listingRes = await pool.query<{ title: string; owner_id: string }>(

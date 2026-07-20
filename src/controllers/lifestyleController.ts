@@ -4,6 +4,7 @@ import {
   upsertLifestyleProfile,
   getRoommatePreferences,
   upsertRoommatePreferences,
+  deleteRoommatePreferences,
 } from '../repositories/lifestyleRepository';
 
 // ─── Lifestyle Profile ────────────────────────────────────────────────────────
@@ -100,4 +101,12 @@ export async function updateMyRoommatePreferences(req: Request, res: Response) {
   });
 
   return res.json(updated);
+}
+
+export async function deleteMyRoommatePreferences(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+  await deleteRoommatePreferences(userId);
+  return res.json({ success: true, message: 'Đã xóa bộ lọc mềm' });
 }

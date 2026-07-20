@@ -21,17 +21,30 @@ export async function createTransaction(params: {
   packageName: string;
   status?: string;
 }): Promise<PaymentTransactionRecord> {
+  try {
+    const result = await pool.query<PaymentTransactionRecord>(
+      `INSERT INTO payment_transactions (user_id, listing_id, amount, package_name, status, code)
+       VALUES ($1, $2, $3, $4, $5, 'RM' || TO_CHAR(NOW(), 'YY') || LPAD(nextval('payment_code_seq')::TEXT, 4, '0'))
+       RETURNING *`,
+      [
+        params.userId,
+        params.listingId,
+        params.amount,
+        params.packageName,
+        params.status ?? "COMPLETED",
+      ]
+    );
+    return result.rows[0];
+  } catch (e) {
+    console.error("createTransaction error:", e);
+    throw e;
+  }
+}
+
+export async function updateTransactionStatus(transactionId: string, status: string) {
   const result = await pool.query<PaymentTransactionRecord>(
-    `INSERT INTO payment_transactions (user_id, listing_id, amount, package_name, status, code)
-     VALUES ($1, $2, $3, $4, $5, 'RM' || TO_CHAR(NOW(), 'YY') || LPAD(nextval('payment_code_seq')::TEXT, 4, '0'))
-     RETURNING *`,
-    [
-      params.userId,
-      params.listingId,
-      params.amount,
-      params.packageName,
-      params.status ?? "COMPLETED",
-    ]
+    "UPDATE payment_transactions SET status = $1 WHERE id = $2 RETURNING *",
+    [status, transactionId]
   );
   return result.rows[0];
 }
