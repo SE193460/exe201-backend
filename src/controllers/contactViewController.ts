@@ -22,9 +22,6 @@ export async function viewContact(req: Request, res: Response) {
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
     if (!listingId) return res.status(400).json({ error: "Missing listingId" });
 
-    const success = await contactViewRepo.deductContactView(userId, listingId as string);
-    if (!success) return res.status(403).json({ error: "Insufficient contact views", remaining: 0 });
-
     const result = await pool.query(
       `SELECT u.phone_number AS phone, u.full_name AS owner_name
        FROM listings l
@@ -39,10 +36,53 @@ export async function viewContact(req: Request, res: Response) {
       success: true,
       phone: listing.phone,
       name: listing.owner_name,
-      message: "Contact view deducted",
+      message: "Contact information is public",
     });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
+  }
+}
+
+export async function viewLifestyleProfile(req: Request, res: Response) {
+  try {
+    const userId = (req as any).user?.id;
+    const { listingId } = req.params;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    if (!listingId) return res.status(400).json({ error: "Missing listingId" });
+
+    const result = await contactViewRepo.revealOwnerLifestyleProfile(userId, listingId as string);
+    if (result.insufficientViews) {
+      return res.status(403).json({ error: "Insufficient contact views", remaining: 0 });
+    }
+    if (!result.profile) {
+      return res.status(404).json({ error: "Lifestyle profile not found" });
+    }
+
+    return res.json({
+      success: true,
+      alreadyViewed: result.alreadyViewed,
+      remainingViews: result.remainingViews,
+      profile: result.profile,
+    });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+export async function getLifestyleProfileAccess(req: Request, res: Response) {
+  try {
+    const userId = (req as any).user?.id;
+    const { listingId } = req.params;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    if (!listingId) return res.status(400).json({ error: "Missing listingId" });
+
+    const viewed = await contactViewRepo.hasViewedListing(userId, listingId as string);
+    if (!viewed) return res.json({ revealed: false });
+
+    const result = await contactViewRepo.revealOwnerLifestyleProfile(userId, listingId as string);
+    return res.json({ revealed: Boolean(result.profile), profile: result.profile, remainingViews: result.remainingViews });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
   }
 }
 
@@ -60,13 +100,16 @@ export async function purchaseContactViews(req: Request, res: Response) {
       status: "QR_GENERATED",
     });
 
-    const qrContent = `ROOMIE_VIEW_#${transaction.id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+    const qrContent = transaction.code || "RM000000";
     const qrUrl = `https://img.vietqr.io/image/MOMO-0704542270-compact2.png?amount=${Math.abs(amount)}&addInfo=${encodeURIComponent(qrContent)}&accountName=Luong%20Anh%20Mai`;
 
     res.json({
       transactionId: transaction.id,
       qrUrl,
       content: qrContent,
+      code: qrContent,
+      syntax: "Mã giao dịch",
+      example: qrContent,
       amount: Math.abs(amount),
       recipientInfo: {
         name: "Luong Anh Mai",
