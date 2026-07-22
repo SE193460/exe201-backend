@@ -12,6 +12,7 @@ import {
 } from '../repositories/lifestyleRepository';
 import {
   calculateMatchScore,
+  hasAnyLifestyleValue,
   LifestyleProfile,
   RoommatePreferences,
 } from '../services/matchingService';
@@ -133,10 +134,11 @@ export async function softFilter(req: Request, res: Response) {
 
     const results = users
       .filter((u) => u.user_id !== userId) // loại chính mình
-      .map((u) => {
+      .flatMap((u) => {
         const profile = toMatchProfile(u.profile as Record<string, unknown> | null);
+        if (!hasAnyLifestyleValue(profile)) return [];
         const { total_score, field_scores } = calculateMatchScore(profile, myPreferences);
-        return {
+        return [{
           id:          u.user_id,
           full_name:   u.full_name,
           avatar_url:  u.avatar_url,
@@ -145,7 +147,7 @@ export async function softFilter(req: Request, res: Response) {
           zalo:        u.zalo,
           total_score,
           field_scores,
-        };
+        }];
       })
       .sort((a, b) => b.total_score - a.total_score);
 
@@ -156,10 +158,11 @@ export async function softFilter(req: Request, res: Response) {
   const listings = await findApprovedListingsWithOwnerProfile(filters);
 
   const results = listings
-    .map((l) => {
+    .flatMap((l) => {
       const ownerProfile = toMatchProfile(l.profile as Record<string, unknown> | null);
+      if (!hasAnyLifestyleValue(ownerProfile)) return [];
       const { total_score, field_scores } = calculateMatchScore(ownerProfile, myPreferences);
-      return {
+      return [{
         id:           l.listing_id,
         title:        l.title,
         rent_price:   l.rent_price,
@@ -175,7 +178,7 @@ export async function softFilter(req: Request, res: Response) {
         },
         total_score,
         field_scores,
-      };
+      }];
     })
     .sort((a, b) => b.total_score - a.total_score);
 

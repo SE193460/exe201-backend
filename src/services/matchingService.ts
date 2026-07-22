@@ -110,6 +110,23 @@ function linearPrefLabel(field: string, pref: number): string {
 
 // ─── Scoring functions ────────────────────────────────────────────────────────
 
+export function hasAnyLifestyleValue(profile: LifestyleProfile): boolean {
+  return (
+    profile.cleanliness != null ||
+    profile.ac_usage != null ||
+    profile.pet_status != null ||
+    profile.smoking_status != null ||
+    profile.cooking != null ||
+    profile.guest != null ||
+    profile.home_frequency != null ||
+    profile.work_schedule != null ||
+    profile.sharing != null ||
+    profile.noise != null ||
+    profile.call_frequency != null ||
+    profile.game_mic != null
+  );
+}
+
 function scoreLinear(
   profileVal: number | null | undefined,
   prefVal: number,
@@ -207,6 +224,10 @@ export function calculateMatchScore(
   profile: LifestyleProfile,
   preferences: RoommatePreferences,
 ): MatchResult {
+  if (!hasAnyLifestyleValue(profile)) {
+    return { total_score: 0, field_scores: {} };
+  }
+
   let weightedSum = 0;
   let activeWeight = 0;
   const field_scores: Record<string, FieldScore> = {};
