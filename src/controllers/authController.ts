@@ -38,6 +38,10 @@ export async function register(req: Request, res: Response) {
       return res.status(409).json({ message: "Email already exists" });
     }
 
+    if ((error as Error).message === "USERNAME_EXISTS") {
+      return res.status(409).json({ message: "Tên đăng nhập đã tồn tại" });
+    }
+
     if ((error as Error).message === "EMAIL_SEND_FAILED") {
       return res.status(502).json({ message: "Email send failed" });
     }
