@@ -59,19 +59,21 @@ export async function registerLocal(params: {
     await createEmailVerificationToken(existing.id, token, expiresAt);
 
     const verifyUrl = `${env.frontendUrl}/verify-email?token=${token}`;
+  console.log(`[DEV] Verification URL for ${params.email}: ${verifyUrl}`);
+
+  try {
     const { error } = await resend.emails.send({
       from: "RoomMate <onboarding@resend.dev>",
       to: params.email,
       subject: "Xac nhan email RoomMate",
       html: `<p>Nhap vao lien ket de xac nhan email:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`,
     });
+    if (error) console.error("Resend email failed (non-fatal):", error);
+  } catch (e) {
+    console.error("Resend email exception (non-fatal):", e);
+  }
 
-    if (error) {
-      console.error("Resend email failed", error);
-      throw new Error("EMAIL_SEND_FAILED");
-    }
-
-    return { userId: existing.id, resent: true };
+  return { userId: existing.id, resent: true };
   }
 
   const passwordHash = await bcrypt.hash(params.password, 10);

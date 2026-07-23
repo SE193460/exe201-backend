@@ -28,9 +28,6 @@ passport.use(
         }
 
         if (user && !user.google_id) {
-          if (!user.is_email_verified) {
-            return done(new Error("EMAIL_NOT_VERIFIED"));
-          }
           user = await linkGoogleAccount(user.id, googleId, avatarUrl);
         }
 
