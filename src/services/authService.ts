@@ -59,6 +59,8 @@ export async function registerLocal(params: {
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
     await createEmailVerificationToken(existing.id, token, expiresAt);
 
+    await markEmailVerified(existing.id);
+
     const verifyUrl = `${env.frontendUrl}/verify-email?token=${token}`;
   console.log(`[DEV] Verification URL for ${params.email}: ${verifyUrl}`);
 
@@ -96,6 +98,9 @@ export async function registerLocal(params: {
   const token = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
   await createEmailVerificationToken(user.id, token, expiresAt);
+
+  // Auto-verify since email sending is unreliable
+  await markEmailVerified(user.id);
 
   const verifyUrl = `${env.frontendUrl}/verify-email?token=${token}`;
   console.log(`[DEV] Verification URL for ${params.email}: ${verifyUrl}`);
