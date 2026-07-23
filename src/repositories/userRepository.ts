@@ -19,6 +19,14 @@ export type UserRecord = {
   last_active_at?: string;
 };
 
+export async function findUserByUsername(username: string) {
+  const result = await pool.query<UserRecord>(
+    "SELECT * FROM users WHERE username = $1",
+    [username]
+  );
+  return result.rows[0] || null;
+}
+
 export async function findUserByEmail(email: string): Promise<UserRecord | null> {
   const result = await pool.query<UserRecord>("SELECT * FROM users WHERE email = $1", [email]);
   return result.rows[0] || null;

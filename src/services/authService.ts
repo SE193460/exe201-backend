@@ -16,6 +16,7 @@ import {
   createLocalUser,
   findUserByEmail,
   findUserById,
+  findUserByUsername,
   markEmailVerified,
   updatePasswordHash,
   UserRecord,
@@ -77,6 +78,14 @@ export async function registerLocal(params: {
   }
 
   const passwordHash = await bcrypt.hash(params.password, 10);
+
+  if (params.username) {
+    const existingUsername = await findUserByUsername(params.username);
+    if (existingUsername) {
+      throw new Error("USERNAME_EXISTS");
+    }
+  }
+
   const user = await createLocalUser({
     email: params.email,
     passwordHash,
