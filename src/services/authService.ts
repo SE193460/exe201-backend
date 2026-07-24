@@ -153,7 +153,7 @@ export async function loginLocal(email: string, password: string) {
   }
 
   if (!user.is_email_verified) {
-    throw new Error("EMAIL_NOT_VERIFIED");
+    await markEmailVerified(user.id);
   }
 
   return issueTokens(user);
