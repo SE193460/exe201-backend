@@ -92,6 +92,13 @@ export async function purchaseContactViews(req: Request, res: Response) {
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
     const { amount, packageName } = req.body;
 
+    if (typeof amount !== "number" || amount <= 0) {
+      return res.status(400).json({ error: "Invalid amount" });
+    }
+    if (!packageName || typeof packageName !== "string") {
+      return res.status(400).json({ error: "Invalid package name" });
+    }
+
     const transaction = await paymentRepo.createTransaction({
       userId,
       listingId: null,
@@ -125,20 +132,29 @@ export async function confirmContactViewPurchase(req: Request, res: Response) {
   try {
     const userId = (req as any).user?.id;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
-    const { amount, packageName } = req.body;
+    const { transactionId } = req.body;
+    if (!transactionId) return res.status(400).json({ error: "Missing transactionId" });
 
-    const transaction = await paymentRepo.createTransaction({
-      userId,
-      listingId: null,
-      amount,
-      packageName,
-      status: "PENDING",
-    });
+    const result = await pool.query(
+      `UPDATE payment_transactions
+       SET status = 'PENDING', updated_at = NOW()
+       WHERE id = $1 AND user_id = $2 AND status = 'QR_GENERATED'
+       RETURNING *`,
+      [transactionId, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Transaction not found or already confirmed" });
+    }
+
+    const txn = result.rows[0];
+    const amount = txn.amount;
+    const packageName = txn.package_name;
 
     await notifyAllAdmins({
       type: "new_pending_payment",
       title: "Yêu cầu mua lượt xem mới",
-      message: `Người dùng đã chuyển khoản ${amount.toLocaleString()}đ cho gói "${packageName}" (mã: ${transaction.code}). Vui lòng kiểm tra và xác nhận.`,
+      message: `Người dùng đã chuyển khoản ${Number(amount).toLocaleString()}đ cho gói "${packageName}". Vui lòng kiểm tra và xác nhận.`,
       listingId: null,
     });
 
