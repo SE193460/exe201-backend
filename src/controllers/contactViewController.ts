@@ -137,7 +137,7 @@ export async function confirmContactViewPurchase(req: Request, res: Response) {
 
     const result = await pool.query(
       `UPDATE payment_transactions
-       SET status = 'PENDING', updated_at = NOW()
+       SET status = 'PENDING'
        WHERE id = $1 AND user_id = $2 AND status = 'QR_GENERATED'
        RETURNING *`,
       [transactionId, userId]
