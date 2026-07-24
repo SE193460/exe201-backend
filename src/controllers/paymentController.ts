@@ -48,7 +48,7 @@ export async function generateQR(req: Request, res: Response) {
       status: "QR_GENERATED",
     });
 
-    const paymentCode = transaction.code || "RM000000";
+    const paymentCode = `ROOMIE_${userId.slice(0, 8)}_${pkg.label.replace(/\s+/g, "_")}`;
     const listingCode = shortCode(listingId);
 
     // VietQR — works with any banking app, recipient is Momo account

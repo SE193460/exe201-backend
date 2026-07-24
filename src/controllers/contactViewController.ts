@@ -100,7 +100,7 @@ export async function purchaseContactViews(req: Request, res: Response) {
       status: "QR_GENERATED",
     });
 
-    const qrContent = transaction.code || "RM000000";
+    const qrContent = `ROOMIE_${userId.slice(0, 8)}_${packageName.replace(/\s+/g, "_")}`;
     const qrUrl = `https://img.vietqr.io/image/MOMO-0704542270-compact2.png?amount=${Math.abs(amount)}&addInfo=${encodeURIComponent(qrContent)}&accountName=Luong%20Anh%20Mai`;
 
     res.json({
