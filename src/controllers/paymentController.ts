@@ -165,9 +165,9 @@ export async function adminConfirmPayment(req: Request, res: Response) {
 
     const txn = txnRes.rows[0];
 
-    // Handle contact view credit packages
-    if (txn.package_name.includes("Gói 5 lượt xem") || txn.package_name.includes("Gói 20 lượt xem")) {
-      const views = txn.package_name.includes("Gói 5 lượt xem") ? 5 : 20;
+    // Handle contact view credit packages (no listing_id = contact view purchase)
+    if (!txn.listing_id) {
+      const views = txn.amount === 5000 ? 5 : 20;
       await pool.query(
         "UPDATE payment_transactions SET status = 'COMPLETED' WHERE id = $1",
         [transactionId]
