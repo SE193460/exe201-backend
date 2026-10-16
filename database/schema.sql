@@ -155,6 +155,10 @@ CREATE TABLE user_lifestyle_profiles (
     -- Khu vực mong muốn (chỉ dùng cho user chưa có phòng)
     preferred_district TEXT,
 
+    -- Bật/tắt ghép đôi tự động (auto match). FALSE = người dùng muốn tự chọn
+    -- tiêu chí và không tự động chấm điểm phù hợp.
+    auto_match_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+
     -- Field 1: Độ sạch sẽ
     -- 1: Rất sạch, 2: Khá sạch, 3: Bình thường, 4: Khá bừa bộn
     cleanliness INTEGER CHECK (cleanliness BETWEEN 1 AND 4),

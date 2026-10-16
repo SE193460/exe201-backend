@@ -7,7 +7,9 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "db:setup": "ts-node --transpile-only database/setup.ts",
-    "db:migrate": "ts-node --transpile-only database/run_migration.ts"
+    "db:migrate": "ts-node --transpile-only database/run_migration.ts",
+    "db:exec": "ts-node --transpile-only database/run_sql.ts",
+    "db:seed": "ts-node --transpile-only database/seed.ts"
   },
   "keywords": [],
   "author": "",

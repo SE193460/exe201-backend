@@ -35,6 +35,7 @@ export async function updateMyLifestyleProfile(req: Request, res: Response) {
     noise,
     call_frequency,
     game_mic,
+    auto_match_enabled,
   } = req.body;
 
   const updated = await upsertLifestyleProfile(userId, {
@@ -51,6 +52,8 @@ export async function updateMyLifestyleProfile(req: Request, res: Response) {
     noise:              noise              ?? null,
     call_frequency:     call_frequency     ?? null,
     game_mic:           game_mic           ?? null,
+    auto_match_enabled:
+      typeof auto_match_enabled === 'boolean' ? auto_match_enabled : undefined,
   });
 
   return res.json(updated);
