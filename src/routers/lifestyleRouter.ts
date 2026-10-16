@@ -11,18 +11,20 @@ import { softFilter } from '../controllers/softFilterController';
 
 const router = Router();
 
-router.use(requireAuth);
+// NOTE: this router is mounted at "/api", so a global router.use(requireAuth)
+// would also gate every other /api/* route registered afterwards. Apply
+// requireAuth per route instead.
 
 // Lifestyle profile
-router.get('/lifestyle-profile',    getMyLifestyleProfile);
-router.put('/lifestyle-profile',    updateMyLifestyleProfile);
+router.get('/lifestyle-profile',    requireAuth, getMyLifestyleProfile);
+router.put('/lifestyle-profile',    requireAuth, updateMyLifestyleProfile);
 
 // Roommate preferences
-router.get('/roommate-preferences', getMyRoommatePreferences);
-router.put('/roommate-preferences', updateMyRoommatePreferences);
-router.delete('/roommate-preferences', deleteMyRoommatePreferences);
+router.get('/roommate-preferences', requireAuth, getMyRoommatePreferences);
+router.put('/roommate-preferences', requireAuth, updateMyRoommatePreferences);
+router.delete('/roommate-preferences', requireAuth, deleteMyRoommatePreferences);
 
 // Soft filter
-router.post('/soft-filter', softFilter);
+router.post('/soft-filter', requireAuth, softFilter);
 
 export default router;

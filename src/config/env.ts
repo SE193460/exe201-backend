@@ -9,7 +9,13 @@ type Env = {
   googleClientId: string;
   googleClientSecret: string;
   frontendUrl: string;
-  resendApiKey: string;
+  resendApiKey: string | null;
+  smtpHost: string | null;
+  smtpPort: number;
+  smtpSecure: boolean;
+  smtpUser: string | null;
+  smtpPass: string | null;
+  mailFrom: string;
   backendUrl: string;
   nodeEnv: string;
   adminEmail: string | null;
@@ -18,6 +24,7 @@ type Env = {
   cloudinaryCloudName: string;
   cloudinaryApiKey: string;
   cloudinaryApiSecret: string;
+  imageProxyAllowedHosts: string | null;
 };
 
 function requireEnv(name: string): string {
@@ -25,6 +32,27 @@ function requireEnv(name: string): string {
   if (!value) {
     throw new Error(`Missing required env var: ${name}`);
   }
+  return value;
+}
+
+const WEAK_JWT_SECRETS = ["replace_me", "secret", "changeme", "change_me", "jwt_secret", "test", "password"];
+
+function requireJwtSecret(): string {
+  const value = requireEnv("JWT_SECRET");
+  const normalized = value.trim().toLowerCase();
+
+  // Always reject placeholder values, in every environment.
+  if (WEAK_JWT_SECRETS.includes(normalized)) {
+    throw new Error(
+      `JWT_SECRET is set to a known placeholder value. Generate a strong secret, e.g.: node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`
+    );
+  }
+
+  // In production, also require a minimum length.
+  if (process.env.NODE_ENV === "production" && value.length < 32) {
+    throw new Error("JWT_SECRET must be at least 32 characters long in production.");
+  }
+
   return value;
 }
 
@@ -48,11 +76,17 @@ function getBackendUrl(): string {
 export const env: Env = {
   port: Number(process.env.PORT) || 3000,
   databaseUrl: requireEnv("DATABASE_URL"),
-  jwtSecret: requireEnv("JWT_SECRET"),
+  jwtSecret: requireJwtSecret(),
   googleClientId: requireEnv("GOOGLE_CLIENT_ID"),
   googleClientSecret: requireEnv("GOOGLE_CLIENT_SECRET"),
   frontendUrl: requireEnv("FRONTEND_URL"),
-  resendApiKey: requireEnv("RESEND_API_KEY"),
+  resendApiKey: process.env.RESEND_API_KEY || null,
+  smtpHost: process.env.SMTP_HOST || null,
+  smtpPort: Number(process.env.SMTP_PORT) || 587,
+  smtpSecure: (process.env.SMTP_SECURE || "").toLowerCase() === "true",
+  smtpUser: process.env.SMTP_USER || null,
+  smtpPass: process.env.SMTP_PASS || null,
+  mailFrom: process.env.MAIL_FROM || "RoomMate <no-reply@roommate.local>",
   backendUrl: getBackendUrl(),
   nodeEnv: process.env.NODE_ENV || "development",
   adminEmail: process.env.ADMIN_EMAIL || null,
@@ -61,4 +95,5 @@ export const env: Env = {
   cloudinaryCloudName: requireEnv("CLOUDINARY_CLOUD_NAME"),
   cloudinaryApiKey: requireEnv("CLOUDINARY_API_KEY"),
   cloudinaryApiSecret: requireEnv("CLOUDINARY_API_SECRET"),
+  imageProxyAllowedHosts: process.env.IMAGE_PROXY_ALLOWED_HOSTS || null,
 };

@@ -162,5 +162,12 @@ export async function toggleUserActive(userId: string, isActive: boolean) {
 }
 
 export async function updateLastActive(userId: string): Promise<void> {
-  await pool.query("UPDATE users SET last_active_at = NOW() WHERE id = $1", [userId]);
+  // Throttled: only write if the value is stale, to avoid a write on every request.
+  await pool.query(
+    `UPDATE users
+     SET last_active_at = NOW()
+     WHERE id = $1
+       AND (last_active_at IS NULL OR last_active_at < NOW() - INTERVAL '5 minutes')`,
+    [userId]
+  );
 }

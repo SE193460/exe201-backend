@@ -104,3 +104,5 @@ CREATE TABLE IF NOT EXISTS contact_view_log (
   viewed_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_contact_view_log_user_id ON contact_view_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_contact_view_log_listing_id ON contact_view_log(listing_id);
+CREATE INDEX IF NOT EXISTS idx_contact_view_log_user_listing ON contact_view_log(user_id, listing_id);

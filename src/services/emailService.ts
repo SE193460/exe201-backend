@@ -1,7 +1,4 @@
-import { Resend } from "resend";
-import { env } from "../config/env";
-
-const resend = new Resend(env.resendApiKey);
+import { sendMail } from "./mailer";
 
 type InvoiceParams = {
   to: string;
@@ -64,15 +61,9 @@ export async function sendInvoiceEmail(params: InvoiceParams) {
     </html>
   `;
 
-  const { error } = await resend.emails.send({
-    from: "RoomMate <onboarding@resend.dev>",
+  await sendMail({
     to: params.to,
     subject: `Hóa đơn điện tử - ${params.packageName} - RoomMate`,
     html,
   });
-
-  if (error) {
-    console.error("Resend invoice error:", error);
-    throw error;
-  }
 }
