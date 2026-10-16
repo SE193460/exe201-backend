@@ -25,6 +25,9 @@ type Env = {
   cloudinaryApiKey: string;
   cloudinaryApiSecret: string;
   imageProxyAllowedHosts: string | null;
+  assistantApiKey: string | null;
+  assistantApiBaseUrl: string;
+  assistantModel: string;
 };
 
 function requireEnv(name: string): string {
@@ -96,4 +99,7 @@ export const env: Env = {
   cloudinaryApiKey: requireEnv("CLOUDINARY_API_KEY"),
   cloudinaryApiSecret: requireEnv("CLOUDINARY_API_SECRET"),
   imageProxyAllowedHosts: process.env.IMAGE_PROXY_ALLOWED_HOSTS || null,
+  assistantApiKey: process.env.ASSISTANT_API_KEY || process.env.OPENAI_API_KEY || null,
+  assistantApiBaseUrl: (process.env.ASSISTANT_API_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, ""),
+  assistantModel: process.env.ASSISTANT_MODEL || "gpt-4o-mini",
 };

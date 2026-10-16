@@ -24,6 +24,7 @@ import notificationRouter from "./routers/notificationRouter";
 import feedbackRouter from "./routers/feedbackRouter";
 import contactViewRouter from "./routers/contactViewRouter";
 import analyticsRouter from "./routers/analyticsRouter";
+import assistantRouter from "./routers/assistantRouter";
 import { proxyImage } from "./controllers/imageProxyController";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler";
 import { apiLimiter, authLimiter } from "./middlewares/rateLimiter";
@@ -102,6 +103,7 @@ app.use("/api/payments", paymentRouter);
 app.use("/api/reports", reportRouter);
 app.use("/api/notifications", notificationRouter);
 app.use("/api/analytics", analyticsRouter);
+app.use("/api/assistant", assistantRouter);
 app.use("/api/contact-views", contactViewRouter);
 app.get("/api/images/proxy", proxyImage);
 

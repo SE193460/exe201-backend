@@ -61,6 +61,9 @@ All variables live in `.env` (see `.env.example` for the full annotated list).
 | `REQUIRE_EMAIL_VERIFICATION` | no | Defaults to `true` in production, `false` otherwise. |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NAME` | no | Bootstrap an admin account on startup. |
 | `IMAGE_PROXY_ALLOWED_HOSTS` | no | Comma-separated hosts the image proxy may fetch. Defaults to `fbcdn.net,facebook.com,cloudinary.com`. |
+| `ASSISTANT_API_KEY` | no | Enables the AI assistant's LLM answers. Without it the assistant uses built-in offline FAQ answers. |
+| `ASSISTANT_API_BASE_URL` | no | OpenAI-compatible base URL. Defaults to `https://api.openai.com/v1`. |
+| `ASSISTANT_MODEL` | no | Model used by the assistant. Defaults to `gpt-4o-mini`. |
 
 Generate a strong JWT secret:
 
@@ -114,6 +117,7 @@ All endpoints are prefixed with `/api` except `GET /health`.
 | `/api/analytics` | Event tracking + admin summary. |
 | `/api/contact-views` | Paid contact-view credits and lifestyle-profile access. |
 | `/api/images/proxy` | Allow-listed image proxy (SSRF-safe). |
+| `/api/assistant` | Roomie AI assistant chat (`POST /api/assistant/chat`). LLM when `ASSISTANT_API_KEY` is set, offline FAQ otherwise. Public. |
 
 Authentication uses a `Bearer` access token plus an httpOnly refresh-token cookie.
 

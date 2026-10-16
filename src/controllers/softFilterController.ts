@@ -87,34 +87,51 @@ function profileToPreferences(profile: LifestyleProfileRecord): Record<string, u
 
 export async function softFilter(req: Request, res: Response) {
   const userId = req.user?.id;
-  if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-  const { user_type, hard_filters, use_lifestyle_profile } = req.body as {
+  const { user_type, hard_filters, use_lifestyle_profile, preferences } = req.body as {
     user_type: 'HAS_ROOM' | 'NO_ROOM';
     hard_filters?: HardFilters;
     use_lifestyle_profile?: boolean;
+    // Anonymous visitors (and logged-in users who haven't saved anything yet)
+    // can supply their preferences inline so the soft filter works without an account.
+    preferences?: Record<string, unknown>;
   };
 
   if (user_type !== 'HAS_ROOM' && user_type !== 'NO_ROOM') {
     return res.status(400).json({ message: 'user_type phải là HAS_ROOM hoặc NO_ROOM' });
   }
 
-  // Lấy preferences của user hiện tại (dùng cho cả 2 mode)
+  // Preferences can come from three places, in priority order:
+  //   1. inline `preferences` in the request body (works for guests),
+  //   2. the user's saved roommate_preferences,
+  //   3. the user's lifestyle profile (used only as a fallback).
   let prefsRaw: Record<string, unknown> | null = null;
   let source: 'roommate_preferences' | 'lifestyle_profile' = 'roommate_preferences';
 
-  // Nếu không yêu cầu dùng lifestyle profile → lấy roommate_preferences trước
-  if (!use_lifestyle_profile) {
-    prefsRaw = await getRoommatePreferences(userId);
+  if (preferences && hasAnyPreference(preferences)) {
+    prefsRaw = preferences;
   }
 
-  // Nếu chưa có bộ lọc mềm (hoặc được yêu cầu) → dùng hồ sơ lối sống làm mặc định
-  if (use_lifestyle_profile || !hasAnyPreference(prefsRaw)) {
-    const profile = await getLifestyleProfile(userId);
-    if (profile) {
-      prefsRaw = profileToPreferences(profile);
-      source = 'lifestyle_profile';
+  if (!hasAnyPreference(prefsRaw)) {
+    if (!userId) {
+      return res.status(400).json({ message: 'Vui lòng chọn ít nhất một tiêu chí để lọc.' });
     }
+
+    if (!use_lifestyle_profile) {
+      prefsRaw = await getRoommatePreferences(userId);
+    }
+
+    if (use_lifestyle_profile || !hasAnyPreference(prefsRaw)) {
+      const profile = await getLifestyleProfile(userId);
+      if (profile) {
+        prefsRaw = profileToPreferences(profile);
+        source = 'lifestyle_profile';
+      }
+    }
+  }
+
+  if (!hasAnyPreference(prefsRaw)) {
+    return res.status(400).json({ message: 'Vui lòng chọn ít nhất một tiêu chí để lọc.' });
   }
 
   const myPreferences = toMatchPreferences(prefsRaw as Record<string, unknown> | null);
@@ -123,6 +140,9 @@ export async function softFilter(req: Request, res: Response) {
 
   // ── HAS_ROOM mode ──────────────────────────────────────────────────────────
   if (user_type === 'HAS_ROOM') {
+    // Finding roommates to share with requires a real listing, hence an account.
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
     const approvedCount = await countApprovedListingsByUser(userId);
     if (approvedCount !== 1) {
       return res.status(400).json({
