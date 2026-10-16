@@ -57,8 +57,12 @@ export async function listNotificationsByUser(userId: string): Promise<Notificat
   return result.rows;
 }
 
-export async function markNotificationRead(notificationId: string): Promise<void> {
-  await pool.query("UPDATE notifications SET is_read = TRUE WHERE id = $1", [notificationId]);
+export async function markNotificationRead(notificationId: string, userId: string): Promise<boolean> {
+  const result = await pool.query(
+    "UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2",
+    [notificationId, userId]
+  );
+  return (result.rowCount ?? 0) > 0;
 }
 
 export async function markAllNotificationsRead(userId: string): Promise<void> {

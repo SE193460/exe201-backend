@@ -49,6 +49,7 @@ export async function findNoRoomUsersWithProfile(
         lp.noise,
         lp.call_frequency,
         lp.game_mic,
+        lp.auto_match_enabled,
         lp.created_at  AS profile_created_at,
         lp.updated_at  AS profile_updated_at
       FROM users u
@@ -93,6 +94,7 @@ export async function findNoRoomUsersWithProfile(
           noise:            row.noise,
           call_frequency:   row.call_frequency,
           game_mic:         row.game_mic,
+          auto_match_enabled: row.auto_match_enabled ?? true,
           created_at:       row.profile_created_at,
           updated_at:       row.profile_updated_at,
         }
@@ -151,6 +153,7 @@ export async function findApprovedListingsWithOwnerProfile(
         lp.noise,
         lp.call_frequency,
         lp.game_mic,
+        lp.auto_match_enabled,
         lp.created_at  AS profile_created_at,
         lp.updated_at  AS profile_updated_at
       FROM listings li
@@ -206,6 +209,7 @@ export async function findApprovedListingsWithOwnerProfile(
           noise:            row.noise,
           call_frequency:   row.call_frequency,
           game_mic:         row.game_mic,
+          auto_match_enabled: row.auto_match_enabled ?? true,
           created_at:       row.profile_created_at,
           updated_at:       row.profile_updated_at,
         }

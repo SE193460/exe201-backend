@@ -17,6 +17,7 @@ export type LifestyleProfileRecord = {
   noise: number | null;
   call_frequency: number | null;
   game_mic: number | null;
+  auto_match_enabled: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -58,9 +59,9 @@ export async function upsertLifestyleProfile(
         user_id, preferred_district,
         cleanliness, ac_usage, pet_status, smoking_status,
         cooking, guest, home_frequency, work_schedule,
-        sharing, noise, call_frequency, game_mic
+        sharing, noise, call_frequency, game_mic, auto_match_enabled
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
       ON CONFLICT (user_id) DO UPDATE SET
         preferred_district = EXCLUDED.preferred_district,
         cleanliness        = EXCLUDED.cleanliness,
@@ -75,6 +76,7 @@ export async function upsertLifestyleProfile(
         noise              = EXCLUDED.noise,
         call_frequency     = EXCLUDED.call_frequency,
         game_mic           = EXCLUDED.game_mic,
+        auto_match_enabled = EXCLUDED.auto_match_enabled,
         updated_at         = NOW()
       RETURNING *`,
     [
@@ -92,6 +94,7 @@ export async function upsertLifestyleProfile(
       data.noise                ?? null,
       data.call_frequency       ?? null,
       data.game_mic             ?? null,
+      data.auto_match_enabled   ?? true,
     ],
   );
   return result.rows[0];

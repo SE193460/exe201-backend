@@ -32,7 +32,7 @@ export async function createRefreshToken(userId: string, token: string, expiresA
 
 export async function getRefreshToken(token: string) {
   const result = await pool.query(
-    "SELECT * FROM refresh_tokens WHERE token = $1",
+    "SELECT * FROM refresh_tokens WHERE token = $1 AND expires_at > NOW()",
     [token]
   );
   return result.rows[0] || null;
@@ -40,4 +40,8 @@ export async function getRefreshToken(token: string) {
 
 export async function revokeRefreshToken(token: string) {
   await pool.query("DELETE FROM refresh_tokens WHERE token = $1", [token]);
+}
+
+export async function deleteExpiredRefreshTokens() {
+  await pool.query("DELETE FROM refresh_tokens WHERE expires_at <= NOW()");
 }

@@ -1,8 +1,8 @@
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
-import { Resend } from "resend";
 import { env } from "../config/env";
+import { sendMail } from "./mailer";
 import {
   createEmailVerificationToken,
   createRefreshToken,
@@ -22,9 +22,35 @@ import {
   UserRecord,
 } from "../repositories/userRepository";
 
-const resend = new Resend(env.resendApiKey);
-
 const refreshDays = 30;
+
+/**
+ * Whether users must confirm their email before they can log in.
+ * Controlled by REQUIRE_EMAIL_VERIFICATION; defaults to true in production.
+ * Locally you can set it to "false" to skip verification while testing.
+ */
+export function isEmailVerificationRequired(): boolean {
+  const explicit = process.env.REQUIRE_EMAIL_VERIFICATION;
+  if (explicit === "true") return true;
+  if (explicit === "false") return false;
+  return env.nodeEnv === "production";
+}
+
+function shouldAutoVerify(): boolean {
+  return !isEmailVerificationRequired();
+}
+
+async function sendVerificationEmail(email: string, verifyUrl: string): Promise<void> {
+  try {
+    await sendMail({
+      to: email,
+      subject: "Xác nhận email RoomMate",
+      html: `<p>Nhấn vào liên kết để xác nhận email:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`,
+    });
+  } catch (error) {
+    console.error("Verification email failed (non-fatal):", error);
+  }
+}
 
 function signAccessToken(user: UserRecord) {
   return jwt.sign(
@@ -59,24 +85,14 @@ export async function registerLocal(params: {
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
     await createEmailVerificationToken(existing.id, token, expiresAt);
 
-    await markEmailVerified(existing.id);
+    if (shouldAutoVerify()) {
+      await markEmailVerified(existing.id);
+    }
 
     const verifyUrl = `${env.frontendUrl}/verify-email?token=${token}`;
-  console.log(`[DEV] Verification URL for ${params.email}: ${verifyUrl}`);
+    await sendVerificationEmail(params.email, verifyUrl);
 
-  try {
-    const { error } = await resend.emails.send({
-      from: "RoomMate <onboarding@resend.dev>",
-      to: params.email,
-      subject: "Xac nhan email RoomMate",
-      html: `<p>Nhap vao lien ket de xac nhan email:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`,
-    });
-    if (error) console.error("Resend email failed (non-fatal):", error);
-  } catch (e) {
-    console.error("Resend email exception (non-fatal):", e);
-  }
-
-  return { userId: existing.id, resent: true };
+    return { userId: existing.id, resent: true };
   }
 
   const passwordHash = await bcrypt.hash(params.password, 10);
@@ -99,24 +115,13 @@ export async function registerLocal(params: {
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
   await createEmailVerificationToken(user.id, token, expiresAt);
 
-  // Auto-verify since email sending is unreliable
-  await markEmailVerified(user.id);
+  // Auto-verify only when email verification is not required.
+  if (shouldAutoVerify()) {
+    await markEmailVerified(user.id);
+  }
 
   const verifyUrl = `${env.frontendUrl}/verify-email?token=${token}`;
-  console.log(`[DEV] Verification URL for ${params.email}: ${verifyUrl}`);
-
-  // Try sending email, but don't fail if it doesn't work
-  try {
-    const { error } = await resend.emails.send({
-      from: "RoomMate <onboarding@resend.dev>",
-      to: params.email,
-      subject: "Xac nhan email RoomMate",
-      html: `<p>Nhap vao lien ket de xac nhan email:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`,
-    });
-    if (error) console.error("Resend email failed (non-fatal):", error);
-  } catch (e) {
-    console.error("Resend email exception (non-fatal):", e);
-  }
+  await sendVerificationEmail(params.email, verifyUrl);
 
   return { userId: user.id, resent: false };
 }
@@ -128,12 +133,16 @@ export async function verifyEmail(token: string) {
   }
   const user = await findUserById(record.user_id);
   if (user?.is_email_verified) {
+    await deleteEmailVerificationToken(token);
     return { status: "ALREADY_VERIFIED" as const };
   }
   if (new Date(record.expires_at) < new Date()) {
+    await deleteEmailVerificationToken(token);
     throw new Error("TOKEN_EXPIRED");
   }
   await markEmailVerified(record.user_id);
+  // Consume the token so it cannot be reused.
+  await deleteEmailVerificationToken(token);
   return { status: "VERIFIED" as const };
 }
 
@@ -153,7 +162,11 @@ export async function loginLocal(email: string, password: string) {
   }
 
   if (!user.is_email_verified) {
-    await markEmailVerified(user.id);
+    if (shouldAutoVerify()) {
+      await markEmailVerified(user.id);
+    } else {
+      throw new Error("EMAIL_NOT_VERIFIED");
+    }
   }
 
   return issueTokens(user);
@@ -179,9 +192,20 @@ export async function refreshAccessToken(refreshToken: string) {
   if (!user) {
     throw new Error("USER_NOT_FOUND");
   }
+  if (!user.is_active) {
+    // A revoked/inactive account should not be able to mint new access tokens.
+    await revokeRefreshToken(refreshToken);
+    throw new Error("ACCOUNT_INACTIVE");
+  }
+
+  // Rotate the refresh token: issue a fresh one and invalidate the old one.
+  const newRefreshToken = signRefreshToken();
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * refreshDays);
+  await createRefreshToken(user.id, newRefreshToken, expiresAt);
+  await revokeRefreshToken(refreshToken);
 
   const accessToken = signAccessToken(user);
-  return { accessToken };
+  return { accessToken, refreshToken: newRefreshToken };
 }
 
 export async function logout(refreshToken: string) {

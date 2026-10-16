@@ -23,9 +23,14 @@ export async function getUnreadCount(req: Request, res: Response) {
 }
 
 export async function readNotification(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
   const rawId = req.params.id;
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
-  await markNotificationRead(id);
+  const updated = await markNotificationRead(id, userId);
+  if (!updated) return res.status(404).json({ message: "Notification not found" });
+
   return res.json({ message: "Marked as read" });
 }
 

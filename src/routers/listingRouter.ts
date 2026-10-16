@@ -14,6 +14,6 @@ router.get("/", getPublicListings);
 router.get("/saved", requireAuth, listMySavedListings);
 router.get("/:id", getPublicListingDetail);
 router.post("/:id/save", requireAuth, toggleMySavedListing);
-router.post("/:id/report", reportListing);
+router.post("/:id/report", requireAuth, reportListing);
 
 export default router;

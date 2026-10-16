@@ -46,10 +46,7 @@ export async function register(req: Request, res: Response) {
       return res.status(502).json({ message: "Email send failed" });
     }
 
-    return res.status(500).json({
-      message: "Registration failed",
-      error: (error as Error).message,
-    });
+    return res.status(500).json({ message: "Registration failed" });
   }
 }
 
@@ -104,7 +101,8 @@ export async function refresh(req: Request, res: Response) {
     if (!refreshToken) {
       return res.status(401).json({ message: "Missing refresh token" });
     }
-    const { accessToken } = await refreshAccessToken(refreshToken);
+    const { accessToken, refreshToken: newRefreshToken } = await refreshAccessToken(refreshToken);
+    setRefreshCookie(res, newRefreshToken);
     return res.json({ accessToken });
   } catch {
     return res.status(401).json({ message: "Invalid refresh token" });

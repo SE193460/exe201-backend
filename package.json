@@ -5,7 +5,11 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
     "build": "tsc",
-    "start": "node dist/app.js"
+    "start": "node dist/app.js",
+    "db:setup": "ts-node --transpile-only database/setup.ts",
+    "db:migrate": "ts-node --transpile-only database/run_migration.ts",
+    "db:exec": "ts-node --transpile-only database/run_sql.ts",
+    "db:seed": "ts-node --transpile-only database/seed.ts"
   },
   "keywords": [],
   "author": "",
@@ -18,9 +22,11 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
-    "nodemon": "^3.1.14",
+    "nodemailer": "^10.1.1",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pg": "^8.20.0",
@@ -36,10 +42,13 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.1.0",
     "@types/node": "^25.8.0",
+    "@types/nodemailer": "^8.0.2",
     "@types/passport": "^1.0.17",
     "@types/passport-google-oauth20": "^2.0.17",
     "@types/pg": "^8.20.0",
     "dbmate": "^2.33.0",
+    "nodemon": "^3.1.14",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "5.9.2"
   }

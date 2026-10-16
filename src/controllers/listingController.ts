@@ -7,7 +7,6 @@ import {
   listListingsByOwner,
   ListingRecord,
   submitListingForApproval,
-  expireApprovedImportedListings,
   listPublicApprovedListings,
   findPublicApprovedListingById,
   findAdminImportedListingById,
@@ -305,7 +304,7 @@ export async function submitMyListing(req: Request, res: Response) {
 }
 
 export async function getPublicListings(req: Request, res: Response) {
-  await expireApprovedImportedListings(30);
+  // Expiry of imported listings is handled by the background scheduler, not on the read path.
   const userId = req.user?.id;
   const listings = await listPublicApprovedListings(userId);
   return res.json(listings.map(serializeListing));
@@ -427,18 +426,35 @@ export async function listMySavedListings(req: Request, res: Response) {
 }
 
 export async function reportListing(req: Request, res: Response) {
-  const reporterId = req.user?.id || null;
+  const reporterId = req.user?.id;
+  if (!reporterId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
   const rawId = req.params.id;
   const listingId = Array.isArray(rawId) ? rawId[0] : rawId;
-  const { reason, description } = req.body;
-  if (!reason) {
-    return res.status(400).json({ message: "Missing report reason" });
+  if (!listingId) {
+    return res.status(400).json({ message: "Missing listing id" });
   }
+
+  const { reason, description } = req.body;
+  if (typeof reason !== "string" || reason.trim().length === 0 || reason.length > 200) {
+    return res.status(400).json({ message: "Invalid report reason" });
+  }
+  if (description != null && (typeof description !== "string" || description.length > 2000)) {
+    return res.status(400).json({ message: "Invalid report description" });
+  }
+
+  const listing = await findPublicApprovedListingById(listingId);
+  if (!listing) {
+    return res.status(404).json({ message: "Listing not found" });
+  }
+
   const report = await createReport({
     reporterId,
     listingId,
-    reason,
-    description: description || null,
+    reason: reason.trim(),
+    description: description ? String(description).trim() : null,
   });
   return res.status(201).json({ message: "Báo cáo bài đăng thành công!", report });
 }

@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: roomie-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: roomie
+      POSTGRES_PASSWORD: roomie_dev_password
+      POSTGRES_DB: roomie
+    ports:
+      - "5434:5432"
+    volumes:
+      - roomie_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U roomie -d roomie"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  roomie_pgdata:
