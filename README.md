@@ -53,6 +53,7 @@ All variables live in `.env` (see `.env.example` for the full annotated list).
 | `JWT_SECRET` | **yes** | Must be strong; placeholders like `replace_me` are rejected at boot. |
 | `BACKEND_URL` | prod | Public URL of this API. |
 | `FRONTEND_URL` | yes | Used for CORS + OAuth redirects. |
+| `CORS_ORIGINS` | no | Comma-separated additional origins allowed by CORS, useful for preview deployments. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | for OAuth | Google sign-in. |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` | for email | Preferred mail channel. |
 | `MAIL_FROM` | for email | e.g. `Roomie <no-reply@yourdomain.com>`. |
@@ -62,8 +63,8 @@ All variables live in `.env` (see `.env.example` for the full annotated list).
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NAME` | no | Bootstrap an admin account on startup. |
 | `IMAGE_PROXY_ALLOWED_HOSTS` | no | Comma-separated hosts the image proxy may fetch. Defaults to `fbcdn.net,facebook.com,cloudinary.com`. |
 | `ASSISTANT_API_KEY` | no | Enables the AI assistant's LLM answers. Without it the assistant uses built-in offline FAQ answers. |
-| `ASSISTANT_API_BASE_URL` | no | OpenAI-compatible base URL. Defaults to `https://api.openai.com/v1`. |
-| `ASSISTANT_MODEL` | no | Model used by the assistant. Defaults to `gpt-4o-mini`. |
+| `ASSISTANT_API_BASE_URL` | no | OpenAI-compatible base URL. Defaults to `https://openrouter.ai/api/v1`. |
+| `ASSISTANT_MODEL` | no | Model used by the assistant. Defaults to `deepseek/deepseek-chat-v3-0324:free` (a free OpenRouter model). |
 
 Generate a strong JWT secret:
 
@@ -74,6 +75,26 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 > **Email verification:** when `REQUIRE_EMAIL_VERIFICATION` is on and no mail channel is
 > configured, the server logs a warning at boot. Set the `SMTP_*` values (works with Gmail
 > app passwords, Brevo, Mailtrap, …) before enabling it in production.
+
+### AI Assistant
+
+The assistant (`POST /api/assistant/chat`) answers in the visitor's current language
+(Vietnamese / English / Japanese). It has two modes:
+
+- **Offline (default, zero config):** a built-in keyword/FAQ engine answers about finding
+  rooms, the soft filter, auto-match, posting, buying lifestyle-profile views, the map, etc.
+- **LLM:** set `ASSISTANT_API_KEY` and it calls an OpenAI-compatible endpoint, falling back
+  to the offline answers if the call fails.
+
+The default provider is **OpenRouter with a free model**, so a single key turns it on. The
+key belongs to whoever runs the server; anyone testing their own copy must add **their own**
+`ASSISTANT_API_KEY` to their `.env`.
+
+```bash
+ASSISTANT_API_KEY=sk-or-v1-...                                   # https://openrouter.ai/keys
+ASSISTANT_API_BASE_URL=https://openrouter.ai/api/v1
+ASSISTANT_MODEL=deepseek/deepseek-chat-v3-0324:free            # any free model: /models?max_price=0
+```
 
 ## Database
 

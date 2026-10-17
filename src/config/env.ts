@@ -9,6 +9,7 @@ type Env = {
   googleClientId: string;
   googleClientSecret: string;
   frontendUrl: string;
+  corsOrigins: string[];
   resendApiKey: string | null;
   smtpHost: string | null;
   smtpPort: number;
@@ -83,6 +84,10 @@ export const env: Env = {
   googleClientId: requireEnv("GOOGLE_CLIENT_ID"),
   googleClientSecret: requireEnv("GOOGLE_CLIENT_SECRET"),
   frontendUrl: requireEnv("FRONTEND_URL"),
+  corsOrigins: (process.env.CORS_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   resendApiKey: process.env.RESEND_API_KEY || null,
   smtpHost: process.env.SMTP_HOST || null,
   smtpPort: Number(process.env.SMTP_PORT) || 587,
@@ -100,6 +105,7 @@ export const env: Env = {
   cloudinaryApiSecret: requireEnv("CLOUDINARY_API_SECRET"),
   imageProxyAllowedHosts: process.env.IMAGE_PROXY_ALLOWED_HOSTS || null,
   assistantApiKey: process.env.ASSISTANT_API_KEY || process.env.OPENAI_API_KEY || null,
-  assistantApiBaseUrl: (process.env.ASSISTANT_API_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, ""),
-  assistantModel: process.env.ASSISTANT_MODEL || "gpt-4o-mini",
+  // Defaults to OpenRouter so a single free API key turns the assistant on.
+  assistantApiBaseUrl: (process.env.ASSISTANT_API_BASE_URL || "https://openrouter.ai/api/v1").replace(/\/+$/, ""),
+  assistantModel: process.env.ASSISTANT_MODEL || "deepseek/deepseek-chat-v3-0324:free",
 };
