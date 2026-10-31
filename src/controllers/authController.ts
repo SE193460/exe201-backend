@@ -13,7 +13,7 @@ import type { UserRecord } from "../repositories/userRepository";
 function setRefreshCookie(res: Response, token: string) {
   res.cookie("refresh_token", token, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: env.nodeEnv === "production" ? "none" : "lax",
     secure: env.nodeEnv === "production",
     maxAge: 1000 * 60 * 60 * 24 * 30,
   });
@@ -112,7 +112,11 @@ export async function refresh(req: Request, res: Response) {
 export async function logoutHandler(req: Request, res: Response) {
   const refreshToken = req.cookies?.refresh_token as string | undefined;
   await logout(refreshToken || "");
-  res.clearCookie("refresh_token");
+  res.clearCookie("refresh_token", {
+    httpOnly: true,
+    sameSite: env.nodeEnv === "production" ? "none" : "lax",
+    secure: env.nodeEnv === "production",
+  });
   return res.json({ message: "Logged out" });
 }
 
