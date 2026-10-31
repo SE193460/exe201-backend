@@ -25,6 +25,7 @@ import feedbackRouter from "./routers/feedbackRouter";
 import contactViewRouter from "./routers/contactViewRouter";
 import analyticsRouter from "./routers/analyticsRouter";
 import assistantRouter from "./routers/assistantRouter";
+import translationRouter from "./routers/translationRouter";
 import { proxyImage } from "./controllers/imageProxyController";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler";
 import { apiLimiter, authLimiter } from "./middlewares/rateLimiter";
@@ -45,12 +46,11 @@ app.use(
   })
 );
 
-// Cho phép nhiều frontend
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://exe201-frontend-inky.vercel.app",
-  "https://exe201-frontend-al15qkuhn-phamthikimhuong11a1-5782s-projects.vercel.app"
-];
+  env.frontendUrl,
+  ...env.corsOrigins,
+].filter((origin, index, origins) => origins.indexOf(origin) === index);
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -104,6 +104,7 @@ app.use("/api/reports", reportRouter);
 app.use("/api/notifications", notificationRouter);
 app.use("/api/analytics", analyticsRouter);
 app.use("/api/assistant", assistantRouter);
+app.use("/api/translations", translationRouter);
 app.use("/api/contact-views", contactViewRouter);
 app.get("/api/images/proxy", proxyImage);
 
