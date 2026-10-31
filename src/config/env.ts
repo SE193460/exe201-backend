@@ -83,10 +83,10 @@ export const env: Env = {
   jwtSecret: requireJwtSecret(),
   googleClientId: requireEnv("GOOGLE_CLIENT_ID"),
   googleClientSecret: requireEnv("GOOGLE_CLIENT_SECRET"),
-  frontendUrl: requireEnv("FRONTEND_URL"),
+  frontendUrl: (process.env.FRONTEND_URL || "http://localhost:5173").trim().replace(/\/+$/, ""),
   corsOrigins: (process.env.CORS_ORIGINS || "")
     .split(",")
-    .map((origin) => origin.trim())
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
     .filter(Boolean),
   resendApiKey: process.env.RESEND_API_KEY || null,
   smtpHost: process.env.SMTP_HOST || null,

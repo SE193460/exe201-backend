@@ -46,22 +46,64 @@ app.use(
   })
 );
 
-const allowedOrigins = [
+const defaultAllowedOrigins = [
   "http://localhost:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:5173",
+  "https://exe201-frontend-inky.vercel.app",
   env.frontendUrl,
   ...env.corsOrigins,
-].filter((origin, index, origins) => origins.indexOf(origin) === index);
+];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true
-}));
+const allowedOrigins = defaultAllowedOrigins
+  .map((origin) => origin?.trim().replace(/\/+$/, ""))
+  .filter((origin, index, origins): origin is string => Boolean(origin) && origins.indexOf(origin) === index);
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (e.g. mobile apps, server-to-server, curl)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const normalizedOrigin = origin.trim().replace(/\/+$/, "");
+
+      // 1. Direct match (case-insensitive)
+      if (allowedOrigins.some((allowed) => allowed.toLowerCase() === normalizedOrigin.toLowerCase())) {
+        return callback(null, true);
+      }
+
+      // 2. Wildcard or pattern matching from CORS_ORIGINS (e.g. *.vercel.app)
+      const isWildcardMatch = allowedOrigins.some((allowed) => {
+        if (allowed === "*") return true;
+        if (allowed.includes("*")) {
+          const pattern = new RegExp(
+            "^" + allowed.replace(/\./g, "\\.").replace(/\*/g, ".*") + "$",
+            "i"
+          );
+          return pattern.test(normalizedOrigin);
+        }
+        return false;
+      });
+      if (isWildcardMatch) {
+        return callback(null, true);
+      }
+
+      // 3. Any preview / branch deployments for exe201-frontend on vercel
+      if (/^https:\/\/exe201-frontend(-[a-z0-9-]+)?\.vercel\.app$/i.test(normalizedOrigin)) {
+        return callback(null, true);
+      }
+
+      console.warn(`[CORS] Blocked request from origin: ${origin}. Allowed origins:`, allowedOrigins);
+      return callback(null, false);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  })
+);
+
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(passport.initialize());
